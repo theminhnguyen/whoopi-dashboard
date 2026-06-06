@@ -898,10 +898,10 @@
     }, 1000);
   }
 
-  function stopDemo() {
+  function stopDemo(doExport) {
     if (state.demoTimer) { clearInterval(state.demoTimer); state.demoTimer = null; }
     state.demo = false;
-    finishSession(false);
+    finishSession(!!doExport);
     els.demoBtn.textContent = "Demo";
     els.connectBtn.disabled = false;
     els.finishBtn.disabled = true;
@@ -921,18 +921,10 @@
   });
   els.finishBtn.addEventListener("click", async () => {
     if (state.demo) {
-      // Demo: aktuelle Session exportieren + Demo weiterlaufen lassen? -> beenden & exportieren
-      if (state.demoTimer) { clearInterval(state.demoTimer); state.demoTimer = null; }
-      state.demo = false;
-      els.demoBtn.textContent = "Demo";
-      els.connectBtn.disabled = false;
-      setConnState("disconnected");
-      els.hero.classList.add("idle");
-      await finishSession(true);
-      els.finishBtn.disabled = true;
+      stopDemo(true);                          // Demo beenden + exportieren
     } else {
       await finishSession(true);
-      // Verbindung bleibt bestehen -> neue Session starten
+      // Verbindung bleibt bestehen -> direkt neue Session starten
       if (state.server) startSession(); else els.finishBtn.disabled = true;
     }
   });
