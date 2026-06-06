@@ -1,360 +1,416 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#121212" />
-  <!-- iOS "Zum Home-Bildschirm" / Vollbild-Look -->
+  <meta name="theme-color" content="#000000" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="WHOOPI" />
+  <meta name="apple-mobile-web-app-title" content="TELEMETRY" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>WHOOPI · Live Dashboard</title>
+  <title>TELEMETRY · WHOOPI Live</title>
   <style>
-    /* ===================== Design-Tokens ===================== */
+    /* ============================ Design-Tokens (TELEMETRY) ============================ */
     :root {
-      --bg: #121212;
-      --bg-card: #1c1c1e;
-      --bg-card-2: #242427;
-      --border: #2e2e32;
-      --text: #f2f2f5;
-      --text-dim: #9a9aa2;
-      --accent: #00e676;      /* Neon-Grün (Puls) */
-      --accent-2: #00e5ff;    /* Neon-Cyan (RR/HRV) */
-      --danger: #ff5252;
-      --warn: #ffb300;
-      --radius: 18px;
-      --shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+      --bg: #000000;
+      --surface: #131313;
+      --surface-container: #1c1b1b;
+      --surface-high: #2a2a2a;
+      --glass: rgba(28, 28, 30, 0.8);
+      --border: rgba(255, 255, 255, 0.10);
+      --text: #e5e2e1;
+      --text-dim: #c4c9ac;          /* leicht olivgrau */
+      --lime: #c3f400;              /* Primär-Akzent */
+      --neon: #ccff00;              /* Neon-Akzent (Glow) */
+      --blue: #4b8eff;
+      --blue-soft: #adc6ff;
+      --error: #ff5252;
+      /* Herzfrequenz-Zonen */
+      --z1: #00d1ff; --z2: #4b8eff; --z3: #ffd600; --z4: #ff7a00; --z5: #ff5252;
+      --radius: 14px;
+      --radius-lg: 20px;
       --safe-top: env(safe-area-inset-top, 0px);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, system-ui, sans-serif;
     }
-
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-
     html, body { height: 100%; }
-
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, system-ui, sans-serif;
+      font-family: var(--font);
       background:
-        radial-gradient(1200px 600px at 50% -10%, rgba(0, 230, 118, 0.06), transparent 60%),
-        radial-gradient(900px 500px at 100% 0%, rgba(0, 229, 255, 0.05), transparent 55%),
+        radial-gradient(900px 500px at 50% -10%, rgba(195, 244, 0, 0.06), transparent 60%),
         var(--bg);
       color: var(--text);
-      min-height: 100%;
-      padding:
-        calc(var(--safe-top) + 14px)
-        16px
-        calc(var(--safe-bottom) + 40px);
-      max-width: 560px;
-      margin: 0 auto;
       -webkit-font-smoothing: antialiased;
+      min-height: 100dvh;
     }
+    /* technische Zahlen */
+    .data { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; font-weight: 700; }
+    .caps { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); font-weight: 600; }
+    .hidden { display: none !important; }
 
-    /* ===================== Banner (Fehler/Hinweise) ===================== */
-    #banner {
-      display: none;
-      border-radius: 14px;
-      padding: 12px 14px;
-      margin-bottom: 14px;
-      font-size: 14px;
-      line-height: 1.4;
-      border: 1px solid transparent;
-    }
-    #banner.show { display: block; }
-    #banner.error   { background: rgba(255, 82, 82, 0.12);  border-color: rgba(255, 82, 82, 0.4);  color: #ff8a8a; }
-    #banner.warn    { background: rgba(255, 179, 0, 0.12);  border-color: rgba(255, 179, 0, 0.4);  color: #ffce5c; }
-    #banner.info    { background: rgba(0, 229, 255, 0.10);  border-color: rgba(0, 229, 255, 0.35); color: #7fe9ff; }
-
-    /* ===================== Header ===================== */
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 18px;
+    /* ============================ Layout ============================ */
+    header.appbar {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(19,19,19,0.85); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: calc(var(--safe-top) + 12px) 20px 12px;
     }
     .brand { display: flex; align-items: center; gap: 10px; }
-    .brand .logo { font-size: 26px; }
-    .brand h1 {
-      font-size: 20px; font-weight: 800; letter-spacing: 0.5px;
-      background: linear-gradient(90deg, var(--accent), var(--accent-2));
-      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    .brand .logo {
+      width: 34px; height: 34px; border-radius: 9px;
+      background: linear-gradient(135deg, var(--lime), #8fb800);
+      display: flex; align-items: center; justify-content: center; color: #161e00; flex: none;
     }
-    .conn-pill {
-      display: flex; align-items: center; gap: 7px;
-      background: var(--bg-card); border: 1px solid var(--border);
-      padding: 6px 11px; border-radius: 999px; font-size: 12px; color: var(--text-dim);
-    }
-    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-dim); transition: background .3s, box-shadow .3s; }
-    .dot.connected { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
-    .dot.connecting { background: var(--warn); box-shadow: 0 0 10px var(--warn); animation: blink 1s infinite; }
-    .dot.error { background: var(--danger); box-shadow: 0 0 10px var(--danger); }
-    @keyframes blink { 50% { opacity: .25; } }
+    .brand h1 { font-size: 19px; font-weight: 800; letter-spacing: 0.06em; }
+    .status-chip { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-dim); }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #555; transition: .3s; }
+    .dot.on { background: var(--neon); box-shadow: 0 0 10px var(--neon); }
+    .dot.connecting { background: #ffb300; box-shadow: 0 0 10px #ffb300; animation: blink 1s infinite; }
+    .dot.err { background: var(--error); box-shadow: 0 0 10px var(--error); }
+    @keyframes blink { 50% { opacity: .3; } }
 
-    /* ===================== Buttons ===================== */
-    .actions { display: flex; gap: 10px; margin-bottom: 18px; }
-    button {
-      font-family: inherit; font-size: 15px; font-weight: 700;
-      border: none; border-radius: 14px; padding: 15px 16px;
-      cursor: pointer; transition: transform .08s ease, opacity .2s, background .2s;
-      flex: 1; color: #06120b;
-    }
-    button:active { transform: scale(0.97); }
-    button:disabled { opacity: 0.4; cursor: not-allowed; }
-    .btn-primary { background: linear-gradient(135deg, var(--accent), #00c853); box-shadow: 0 6px 20px rgba(0, 230, 118, 0.25); }
-    .btn-ghost { background: var(--bg-card); color: var(--text); border: 1px solid var(--border); }
-    .btn-danger { background: linear-gradient(135deg, #ff5252, #e53935); color: #fff; box-shadow: 0 6px 20px rgba(255, 82, 82, 0.22); }
-    .btn-row-2 { margin-top: 0; }
+    main { max-width: 760px; margin: 0 auto; padding: 16px 20px calc(var(--safe-bottom) + 110px); }
 
-    /* ===================== BPM-Hero ===================== */
-    .hero {
-      background: linear-gradient(160deg, var(--bg-card), var(--bg-card-2));
-      border: 1px solid var(--border); border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 26px 20px 22px; margin-bottom: 16px;
-      display: flex; flex-direction: column; align-items: center;
-      position: relative; overflow: hidden;
+    /* Karten */
+    .card {
+      background: var(--glass); backdrop-filter: blur(16px);
+      border: 1px solid var(--border); border-radius: var(--radius-lg);
+      padding: 18px;
     }
-    .hero .heart {
-      font-size: 30px; line-height: 1;
-      animation: heartbeat var(--beat, 1s) infinite ease-in-out;
-      transform-origin: center;
-      filter: drop-shadow(0 0 8px rgba(0, 230, 118, 0.5));
-      margin-bottom: 4px;
-    }
-    .hero.idle .heart { animation-play-state: paused; opacity: 0.4; filter: none; }
-    @keyframes heartbeat {
-      0%, 100% { transform: scale(1); }
-      12% { transform: scale(1.18); }
-      24% { transform: scale(1); }
-      36% { transform: scale(1.08); }
-      48% { transform: scale(1); }
-    }
-    .bpm-value {
-      font-size: clamp(72px, 26vw, 132px); font-weight: 800; line-height: 0.95;
-      letter-spacing: -2px; color: var(--accent);
-      text-shadow: 0 0 24px rgba(0, 230, 118, 0.35);
-      transition: text-shadow .15s ease;
-      font-variant-numeric: tabular-nums;
-    }
-    .bpm-value.beat { text-shadow: 0 0 42px rgba(0, 230, 118, 0.8), 0 0 12px rgba(0, 230, 118, 0.9); }
-    .bpm-label { color: var(--text-dim); font-size: 14px; font-weight: 700; letter-spacing: 3px; margin-top: 2px; }
+    .grid { display: grid; gap: 14px; }
+    .g2 { grid-template-columns: 1fr 1fr; }
+    @media (min-width: 720px) { .g-md-3 { grid-template-columns: repeat(3, 1fr); } .g-md-2 { grid-template-columns: 1fr 1fr; } }
 
-    /* ===================== Stats-Grid ===================== */
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
-    .stat {
-      background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 15px 16px; min-height: 92px;
-      display: flex; flex-direction: column; justify-content: space-between;
-    }
-    .stat .k { font-size: 12px; color: var(--text-dim); font-weight: 600; letter-spacing: .4px; display: flex; align-items: center; gap: 6px; }
-    .stat .v { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; }
-    .stat .v.small { font-size: 21px; }
-    .stat .sub { font-size: 11px; color: var(--text-dim); }
-    .v.accent { color: var(--accent); }
-    .v.accent2 { color: var(--accent-2); }
-    .mini-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); display: inline-block; }
+    /* ============================ Live-Tab ============================ */
+    .conn-card { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; position: relative; overflow: hidden; }
+    .conn-card .scan { position: absolute; left:0; top:0; width:100%; height:2px; background: linear-gradient(90deg, transparent, var(--neon), transparent); animation: scan 3.5s linear infinite; }
+    @keyframes scan { 0%{top:0;opacity:0} 50%{opacity:1} 100%{top:100%;opacity:0} }
+    .conn-card .batt { display: flex; flex-direction: column; align-items: flex-end; }
 
-    /* ===================== Charts ===================== */
-    .chart-card {
-      background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 14px 14px 8px; margin-bottom: 16px;
-    }
+    .hero { display: flex; flex-direction: column; align-items: center; padding: 26px 18px 22px; margin-bottom: 14px; }
+    .hero .heart { color: var(--error); animation: beat var(--beat, 1s) infinite ease-in-out; transform-origin: center; }
+    .hero.idle .heart { animation-play-state: paused; opacity: .35; }
+    @keyframes beat { 0%,100%{transform:scale(1)} 12%{transform:scale(1.18)} 24%{transform:scale(1)} 36%{transform:scale(1.07)} 48%{transform:scale(1)} }
+    .hero .bpm { font-size: clamp(64px, 22vw, 112px); line-height: .95; color: var(--lime); text-shadow: 0 0 26px rgba(195,244,0,.3); transition: text-shadow .15s; }
+    .hero .bpm.flash { text-shadow: 0 0 44px rgba(204,255,0,.85), 0 0 14px rgba(204,255,0,.9); }
+    .hero .unit { margin-top: 2px; }
+
+    .metric { display: flex; flex-direction: column; justify-content: space-between; min-height: 104px; }
+    .metric .top { display: flex; align-items: center; justify-content: space-between; }
+    .metric .val { font-size: 30px; margin-top: 10px; }
+    .metric .val.sm { font-size: 22px; }
+    .metric .sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+    .lime { color: var(--lime); } .neon { color: var(--neon); } .blue { color: var(--blue-soft); }
+    .ico { width: 26px; height: 26px; }
+    .ico-sm { width: 18px; height: 18px; }
+
+    /* Chart-Karten */
+    .chart-card { margin-top: 14px; }
     .chart-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-    .chart-title { font-size: 13px; font-weight: 700; color: var(--text-dim); letter-spacing: .5px; display: flex; align-items: center; gap: 7px; }
-    .chart-title .swatch { width: 10px; height: 10px; border-radius: 3px; }
-    .chart-now { font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
-    canvas { width: 100%; height: 110px; display: block; }
+    .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 7px; }
+    canvas { width: 100%; height: 96px; display: block; }
 
-    /* ===================== History ===================== */
-    .section-title { font-size: 14px; font-weight: 800; letter-spacing: .5px; color: var(--text-dim); margin: 22px 4px 12px; display: flex; justify-content: space-between; align-items: center; }
-    .section-title .clear { font-size: 12px; color: var(--danger); cursor: pointer; font-weight: 700; }
-    #history { display: flex; flex-direction: column; gap: 10px; }
-    .hist-item {
-      background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: 14px; padding: 13px 15px;
-      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    /* HR-Zonen */
+    .zone-row { margin-bottom: 12px; }
+    .zone-row:last-child { margin-bottom: 0; }
+    .zone-row .zl { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .08em; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; }
+    .zone-bar { height: 10px; background: rgba(255,255,255,0.05); border-radius: 99px; overflow: hidden; }
+    .zone-bar > div { height: 100%; border-radius: 99px; transition: width .6s cubic-bezier(.4,0,.2,1); }
+
+    /* Buttons */
+    .btns { display: flex; gap: 10px; margin-top: 16px; }
+    button {
+      font-family: inherit; font-size: 15px; font-weight: 700; border: none;
+      border-radius: 13px; padding: 15px 16px; cursor: pointer; flex: 1;
+      transition: transform .08s, opacity .2s, background .2s;
     }
-    .hist-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-    .hist-date { font-size: 14px; font-weight: 700; }
-    .hist-meta { font-size: 12px; color: var(--text-dim); }
-    .hist-stats { display: flex; gap: 14px; text-align: right; flex-shrink: 0; }
-    .hist-stats .hs { display: flex; flex-direction: column; }
-    .hist-stats .hs b { font-size: 16px; font-weight: 800; }
-    .hist-stats .hs span { font-size: 10px; color: var(--text-dim); letter-spacing: .3px; }
-    .hist-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
-    .icon-btn { background: var(--bg-card-2); border: 1px solid var(--border); color: var(--text-dim); border-radius: 9px; padding: 6px 9px; font-size: 12px; font-weight: 700; cursor: pointer; flex: none; }
-    .icon-btn.dl { color: var(--accent-2); }
-    .icon-btn.del { color: var(--danger); }
-    .empty { color: var(--text-dim); font-size: 14px; text-align: center; padding: 24px 10px; border: 1px dashed var(--border); border-radius: 14px; }
+    button:active { transform: scale(.97); }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    .b-primary { background: linear-gradient(135deg, var(--lime), #9fce00); color: #161e00; box-shadow: 0 0 18px rgba(195,244,0,.22); }
+    .b-ghost { background: var(--surface-high); color: var(--text); border: 1px solid var(--border); }
+    .b-danger { background: linear-gradient(135deg, #ff5252, #e53935); color: #fff; }
+    .b-wide { width: 100%; flex: none; }
 
-    footer { text-align: center; color: var(--text-dim); font-size: 11px; margin-top: 26px; line-height: 1.6; }
-    footer code { background: var(--bg-card); padding: 1px 6px; border-radius: 5px; color: var(--accent-2); }
+    /* ============================ Verlauf-Tab ============================ */
+    .sec-title { display: flex; align-items: center; justify-content: space-between; margin: 18px 2px 12px; }
+    .hist-item { display: flex; align-items: center; gap: 14px; padding: 14px; margin-bottom: 10px; cursor: default; }
+    .hist-ico { width: 48px; height: 48px; border-radius: 12px; background: var(--surface-high); display: flex; align-items: center; justify-content: center; color: var(--lime); flex: none; }
+    .hist-main { flex: 1; min-width: 0; }
+    .hist-main h4 { font-size: 15px; font-weight: 700; }
+    .hist-main p { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+    .hist-stat { text-align: right; flex: none; }
+    .hist-stat .b { font-size: 17px; }
+    .hist-stat .s { font-size: 10px; color: var(--text-dim); letter-spacing: .04em; }
+    .hist-actions { display: flex; flex-direction: column; gap: 6px; flex: none; }
+    .icon-btn { background: var(--surface-high); border: 1px solid var(--border); border-radius: 9px; padding: 7px; cursor: pointer; display: flex; color: var(--text-dim); }
+    .empty { text-align: center; color: var(--text-dim); font-size: 14px; padding: 30px 12px; border: 1px dashed var(--border); border-radius: var(--radius-lg); }
 
-    .hidden { display: none !important; }
+    /* ============================ Profil-Tab ============================ */
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 6px; letter-spacing: .04em; }
+    .field input, .field select {
+      width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 11px;
+      padding: 13px 14px; color: var(--text); font-size: 16px; font-family: inherit;
+    }
+    .field input:focus, .field select:focus { outline: none; border-color: var(--lime); }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .save-hint { font-size: 12px; color: var(--lime); margin-top: 4px; min-height: 16px; }
+    .info-box { font-size: 13px; color: var(--text-dim); line-height: 1.55; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+    .info-box b { color: var(--text); }
+    .danger-link { color: var(--error); font-size: 13px; font-weight: 700; background: none; border: none; cursor: pointer; padding: 12px; width: 100%; }
+
+    /* ============================ Bottom-Nav ============================ */
+    nav.bottom {
+      position: fixed; bottom: 0; left: 0; width: 100%; z-index: 50; height: 76px;
+      padding-bottom: var(--safe-bottom);
+      background: rgba(14,14,14,0.85); backdrop-filter: blur(14px);
+      border-top: 1px solid var(--border);
+      display: flex; justify-content: space-around; align-items: center;
+    }
+    nav.bottom a { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text-dim); opacity: .55; cursor: pointer; transition: .2s; flex: 1; }
+    nav.bottom a.active { color: var(--lime); opacity: 1; }
+    nav.bottom a:active { transform: scale(.9); }
+    nav.bottom .nav-label { font-size: 10px; letter-spacing: .08em; font-weight: 600; text-transform: uppercase; }
+
+    /* Banner */
+    #banner { display: none; border-radius: 12px; padding: 12px 14px; margin: 0 0 14px; font-size: 14px; line-height: 1.45; }
+    #banner.show { display: block; }
+    #banner.error { background: rgba(255,82,82,.12); border: 1px solid rgba(255,82,82,.4); color: #ff9a9a; }
+    #banner.warn { background: rgba(255,179,0,.12); border: 1px solid rgba(255,179,0,.4); color: #ffce5c; }
+    #banner.info { background: rgba(204,255,0,.10); border: 1px solid rgba(204,255,0,.35); color: var(--neon); }
+
+    .tab-panel { animation: fade .35s ease; }
+    @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
   </style>
 </head>
 <body>
-  <!-- Hinweis-/Fehlerbanner -->
-  <div id="banner"></div>
-
-  <header>
+  <header class="appbar">
     <div class="brand">
-      <span class="logo">🐭</span>
-      <h1>WHOOPI</h1>
+      <span class="logo" aria-hidden="true">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg>
+      </span>
+      <h1>TELEMETRY</h1>
     </div>
-    <div class="conn-pill">
-      <span id="connDot" class="dot"></span>
-      <span id="connText">Getrennt</span>
-    </div>
+    <div class="status-chip"><span id="connDot" class="dot"></span><span id="connText">Getrennt</span></div>
   </header>
 
-  <div class="actions">
-    <button id="connectBtn" class="btn-primary">Connect WHOOPI</button>
-    <button id="demoBtn" class="btn-ghost">Demo</button>
-  </div>
+  <main>
+    <div id="banner"></div>
 
-  <!-- BPM-Hero -->
-  <div id="hero" class="hero idle">
-    <div class="heart">❤️</div>
-    <div id="bpmValue" class="bpm-value">––</div>
-    <div class="bpm-label">BPM</div>
-  </div>
+    <!-- ========================= LIVE ========================= -->
+    <section id="tab-live" class="tab-panel">
+      <!-- Verbindungs-Karte -->
+      <div class="card conn-card">
+        <div class="scan"></div>
+        <div>
+          <div class="caps">Geräte-Verbindung</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+            <span id="connDot2" class="dot"></span>
+            <span id="connHeadline" style="font-size:17px;font-weight:700;">Kein Gerät</span>
+          </div>
+        </div>
+        <div class="batt">
+          <svg class="ico neon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="16" height="10" rx="2"/><path d="M22 11v2"/><rect x="4" y="9" width="9" height="6" rx="1" fill="currentColor" stroke="none"/></svg>
+          <span id="battVal" class="data" style="font-size:18px;margin-top:2px;">–</span>
+        </div>
+      </div>
 
-  <!-- Stats -->
-  <div class="grid">
-    <div class="stat">
-      <div class="k"><span id="statusMiniDot" class="mini-dot"></span> Status</div>
-      <div id="statusVal" class="v small">Getrennt</div>
-    </div>
-    <div class="stat">
-      <div class="k">🔋 Batterie</div>
-      <div id="battVal" class="v small">–</div>
-    </div>
-    <div class="stat">
-      <div class="k">📈 RR / HRV</div>
-      <div id="rrVal" class="v small accent2">–</div>
-      <div id="rrSub" class="sub">letztes RR-Intervall</div>
-    </div>
-    <div class="stat">
-      <div class="k">⏱ Workout</div>
-      <div id="timerVal" class="v small">00:00</div>
-    </div>
-  </div>
+      <!-- BPM-Hero -->
+      <div id="hero" class="card hero idle">
+        <svg class="heart ico" style="width:30px;height:30px;" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7.5-4.6-10-9.2C.6 8.4 2 5 5.3 5c2 0 3.3 1.1 4.2 2.4l.5.8.5-.8C11.4 6.1 12.7 5 14.7 5 18 5 19.4 8.4 22 11.8 19.5 16.4 12 21 12 21z"/></svg>
+        <span id="bpmValue" class="bpm data">––</span>
+        <span class="unit caps">BPM</span>
+      </div>
 
-  <!-- Charts -->
-  <div class="chart-card">
-    <div class="chart-head">
-      <div class="chart-title"><span class="swatch" style="background:var(--accent)"></span> Live Puls (BPM)</div>
-      <div id="hrNow" class="chart-now" style="color:var(--accent)">––</div>
-    </div>
-    <canvas id="hrChart"></canvas>
-  </div>
+      <!-- Bento: HRV / Signal / Timer -->
+      <div class="grid g2 g-md-3">
+        <div class="card metric">
+          <div class="top"><span class="caps">HRV</span>
+            <svg class="ico-sm neon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
+          </div>
+          <div><span id="rrVal" class="val sm data neon">–</span></div>
+          <div id="rrSub" class="sub">letztes RR-Intervall</div>
+        </div>
+        <div class="card metric">
+          <div class="top"><span class="caps">Signal</span>
+            <svg class="ico-sm blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h.01M7 20v-4M12 20v-8M17 20V8M22 4v16"/></svg>
+          </div>
+          <div><span id="signalVal" class="val sm data">–</span></div>
+          <div id="signalSub" class="sub">Hautkontakt</div>
+        </div>
+        <div class="card metric">
+          <div class="top"><span class="caps">Workout</span>
+            <svg class="ico-sm lime" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>
+          </div>
+          <div><span id="timerVal" class="val sm data">00:00</span></div>
+          <div id="kcalSub" class="sub">– kcal</div>
+        </div>
+      </div>
 
-  <div class="chart-card">
-    <div class="chart-head">
-      <div class="chart-title"><span class="swatch" style="background:var(--accent-2)"></span> RR-Intervalle (ms)</div>
-      <div id="rrNow" class="chart-now" style="color:var(--accent-2)">––</div>
-    </div>
-    <canvas id="rrChart"></canvas>
-  </div>
+      <!-- Charts -->
+      <div class="card chart-card">
+        <div class="chart-head"><span class="caps"><span class="swatch" style="background:var(--lime)"></span>Live Puls</span><span id="hrNow" class="data lime">––</span></div>
+        <canvas id="hrChart"></canvas>
+      </div>
+      <div class="card chart-card">
+        <div class="chart-head"><span class="caps"><span class="swatch" style="background:var(--neon)"></span>RR-Intervalle (ms)</span><span id="rrNow" class="data neon">––</span></div>
+        <canvas id="rrChart"></canvas>
+      </div>
 
-  <button id="finishBtn" class="btn-danger" disabled>Finish &amp; Export Session</button>
+      <!-- HR-Zonen -->
+      <div class="card chart-card">
+        <div class="chart-head"><span class="caps">Herzfrequenz-Zonen</span><span id="zoneTotal" class="data" style="font-size:13px;">00:00</span></div>
+        <div id="zones"></div>
+        <div id="zoneHint" class="sub" style="margin-top:10px;">Trage im Profil deine max. Herzfrequenz ein, um Zonen zu sehen.</div>
+      </div>
 
-  <!-- History -->
-  <div class="section-title">
-    <span>Verlauf</span>
-    <span id="clearHist" class="clear hidden">Alle löschen</span>
-  </div>
-  <div id="history"></div>
+      <!-- Aktionen -->
+      <div class="btns">
+        <button id="connectBtn" class="b-primary">WHOOPI verbinden</button>
+        <button id="demoBtn" class="b-ghost" style="flex:.5;">Demo</button>
+      </div>
+      <button id="finishBtn" class="b-danger b-wide" style="margin-top:10px;" disabled>Session beenden &amp; speichern</button>
+    </section>
 
-  <footer>
-    Daten bleiben lokal auf deinem Gerät · Standard-BLE <code>0x180D</code> / <code>0x180F</code><br />
-    Web Bluetooth benötigt Chrome/Edge (Android/Desktop) oder Bluefy/BLE&nbsp;Link (iOS)
-  </footer>
+    <!-- ========================= VERLAUF ========================= -->
+    <section id="tab-history" class="tab-panel hidden">
+      <div class="sec-title"><span class="caps" style="font-size:13px;">Aufgezeichnete Sessions</span><span id="histCount" class="caps"></span></div>
+      <div id="history"></div>
+    </section>
+
+    <!-- ========================= PROFIL ========================= -->
+    <section id="tab-profile" class="tab-panel hidden">
+      <div class="sec-title"><span class="caps" style="font-size:13px;">Dein Profil</span></div>
+      <div class="card">
+        <div class="row2">
+          <div class="field"><label for="pfAge">Alter</label><input id="pfAge" type="number" inputmode="numeric" min="10" max="120" placeholder="z.B. 30" /></div>
+          <div class="field"><label for="pfWeight">Gewicht (kg)</label><input id="pfWeight" type="number" inputmode="numeric" min="30" max="250" placeholder="z.B. 75" /></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label for="pfSex">Geschlecht</label>
+            <select id="pfSex"><option value="m">männlich</option><option value="f">weiblich</option></select>
+          </div>
+          <div class="field"><label for="pfMaxHr">Max. HR (optional)</label><input id="pfMaxHr" type="number" inputmode="numeric" min="120" max="230" placeholder="Auto: 220 − Alter" /></div>
+        </div>
+        <button id="saveProfile" class="b-primary b-wide">Profil speichern</button>
+        <div id="profileHint" class="save-hint"></div>
+      </div>
+
+      <div class="sec-title"><span class="caps" style="font-size:13px;">Backup &amp; Daten</span></div>
+      <div class="card">
+        <div class="info-box" style="margin-bottom:14px;">
+          Deine Aufzeichnungen liegen <b>nur auf diesem Gerät</b>. Exportiere regelmäßig ein Backup und sichere die Datei über das Teilen-Menü in <b>iCloud Drive</b> oder <b>Proton Drive</b>. So hast du sie auch in einem Jahr noch – und kannst sie auf anderen Geräten importieren.
+        </div>
+        <div class="btns" style="margin-top:0;">
+          <button id="exportBtn" class="b-ghost">Backup exportieren</button>
+          <button id="importBtn" class="b-ghost">Backup importieren</button>
+        </div>
+        <input id="importFile" type="file" accept="application/json,.json" class="hidden" />
+        <div id="storageHint" class="sub" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="card" style="margin-top:14px;">
+        <div class="info-box">
+          <b>WHOOPI Live</b> liest nur Standard-Bluetooth (Herzfrequenz, Batterie). Schlaf-, Recovery- und Strain-Werte berechnet ausschließlich die Original-Whoop-App und sind hier bewusst nicht enthalten. Kalorien &amp; Zonen sind Schätzungen aus deiner Herzfrequenz.
+        </div>
+        <button id="clearAll" class="danger-link">Alle gespeicherten Sessions löschen</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Bottom-Nav -->
+  <nav class="bottom">
+    <a data-tab="live" class="active">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg>
+      <span class="nav-label">Live</span>
+    </a>
+    <a data-tab="history">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+      <span class="nav-label">Verlauf</span>
+    </a>
+    <a data-tab="profile">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+      <span class="nav-label">Profil</span>
+    </a>
+  </nav>
 
   <script>
   "use strict";
   /* =======================================================================
-     WHOOPI Live Dashboard — Single-File Web-Bluetooth-App
-     Liest Standard-BLE Heart-Rate (0x180D/0x2A37) + Battery (0x180F/0x2A19).
-     Charts sind selbst gezeichnet (kein CDN), Verlauf in IndexedDB,
-     Export als CSV (mit iOS-Share-Fallback). Demo-Modus zum Testen ohne Band.
+     TELEMETRY · WHOOPI Live — Single-File Web-Bluetooth-App
+     Standard-BLE Heart Rate (0x180D/0x2A37) + Battery (0x180F/0x2A19).
+     Offline (kein CDN), Verlauf in IndexedDB, JSON-Backup, persistenter
+     Speicher, HR-Zonen & Kalorien-Schätzung (aus Profil), Demo-Modus.
      ======================================================================= */
 
-  // ----- BLE-Konfiguration (Standard-UUIDs des Whoop 4.0) -----
   const CFG = {
     NAME_PREFIX: "WHOOPI",
-    HR_SERVICE: "heart_rate",                 // 0x180D
-    HR_CHAR: "heart_rate_measurement",        // 0x2A37
-    BATT_SERVICE: "battery_service",          // 0x180F
-    BATT_CHAR: "battery_level",               // 0x2A19
-    BATT_POLL_MS: 60000,                      // Batterie alle 60 s neu lesen
-    AUTOSAVE_MS: 15000,                       // laufende Session alle 15 s sichern
-    CHART_POINTS: 150                         // sichtbare Punkte pro Chart
+    HR_SERVICE: "heart_rate", HR_CHAR: "heart_rate_measurement",
+    BATT_SERVICE: "battery_service", BATT_CHAR: "battery_level",
+    BATT_POLL_MS: 60000, AUTOSAVE_MS: 15000, CHART_POINTS: 150
   };
+  // Zonen als % der max. HR (untere Grenze, Name, Farbe)
+  const ZONES = [
+    { min: 0.90, name: "Z5 · Peak",     color: "var(--z5)" },
+    { min: 0.80, name: "Z4 · Anaerob",  color: "var(--z4)" },
+    { min: 0.70, name: "Z3 · Aerob",    color: "var(--z3)" },
+    { min: 0.60, name: "Z2 · Tempo",    color: "var(--z2)" },
+    { min: 0.50, name: "Z1 · Recovery", color: "var(--z1)" }
+  ];
 
-  // ----- DOM-Referenzen -----
   const $ = (id) => document.getElementById(id);
   const els = {
     banner: $("banner"),
-    connectBtn: $("connectBtn"), demoBtn: $("demoBtn"), finishBtn: $("finishBtn"),
-    connDot: $("connDot"), connText: $("connText"),
+    connDot: $("connDot"), connDot2: $("connDot2"), connText: $("connText"), connHeadline: $("connHeadline"),
+    battVal: $("battVal"),
     hero: $("hero"), bpmValue: $("bpmValue"),
-    statusVal: $("statusVal"), statusMiniDot: $("statusMiniDot"),
-    battVal: $("battVal"), rrVal: $("rrVal"), rrSub: $("rrSub"), timerVal: $("timerVal"),
+    rrVal: $("rrVal"), rrSub: $("rrSub"), signalVal: $("signalVal"), signalSub: $("signalSub"),
+    timerVal: $("timerVal"), kcalSub: $("kcalSub"),
     hrNow: $("hrNow"), rrNow: $("rrNow"),
-    history: $("history"), clearHist: $("clearHist")
+    zones: $("zones"), zoneTotal: $("zoneTotal"), zoneHint: $("zoneHint"),
+    connectBtn: $("connectBtn"), demoBtn: $("demoBtn"), finishBtn: $("finishBtn"),
+    history: $("history"), histCount: $("histCount"),
+    pfAge: $("pfAge"), pfWeight: $("pfWeight"), pfSex: $("pfSex"), pfMaxHr: $("pfMaxHr"),
+    saveProfile: $("saveProfile"), profileHint: $("profileHint"),
+    exportBtn: $("exportBtn"), importBtn: $("importBtn"), importFile: $("importFile"),
+    storageHint: $("storageHint"), clearAll: $("clearAll")
   };
 
-  // ----- Laufzeit-State -----
   const state = {
-    device: null, server: null,
-    hrChar: null, battChar: null,
+    device: null, server: null, hrChar: null, battChar: null,
     battTimer: null, autosaveTimer: null, beatTimer: null,
     demo: false, demoTimer: null,
-    sessionActive: false,
-    session: null,             // { id, start, samples: [{t, bpm, rr}] }
-    lastBeatAt: 0
+    sessionActive: false, session: null,
+    profile: { age: null, weight: null, sex: "m", maxHr: null }
   };
 
-  /* =======================================================================
-     UI-Helfer
-     ======================================================================= */
-  function showBanner(msg, type = "info") {
-    els.banner.textContent = msg;
-    els.banner.className = "show " + type;
-  }
+  /* ============================ UI-Helfer ============================ */
+  function showBanner(msg, type = "info") { els.banner.textContent = msg; els.banner.className = "show " + type; }
   function hideBanner() { els.banner.className = ""; }
 
   function setConnState(s) {
-    // s: 'disconnected' | 'connecting' | 'connected' | 'error'
     const map = {
-      disconnected: ["", "Getrennt", "Getrennt"],
-      connecting:   ["connecting", "Verbinde…", "Verbinde…"],
-      connected:    ["connected", "Verbunden", "Verbunden"],
-      error:        ["error", "Fehler", "Fehler"]
+      disconnected: ["", "Getrennt", "Kein Gerät"],
+      connecting: ["connecting", "Verbinde…", "Verbinde…"],
+      connected: ["on", "Verbunden", "Verbunden"],
+      demo: ["on", "Demo", "Demo-Modus"],
+      error: ["err", "Fehler", "Verbindung verloren"]
     };
-    const [cls, pill, stat] = map[s] || map.disconnected;
+    const [cls, chip, head] = map[s] || map.disconnected;
     els.connDot.className = "dot " + cls;
-    els.connText.textContent = pill;
-    els.statusVal.textContent = stat;
-    els.statusMiniDot.style.background = cls
-      ? (cls === "connected" ? "var(--accent)" : cls === "connecting" ? "var(--warn)" : "var(--danger)")
-      : "var(--text-dim)";
+    els.connDot2.className = "dot " + cls;
+    els.connText.textContent = chip;
+    els.connHeadline.textContent = head;
   }
 
-  /* =======================================================================
-     Rolling-Chart (eigenständig, Canvas, Retina-scharf)
-     ======================================================================= */
+  /* ============================ Rolling-Chart ============================ */
   class RollingChart {
     constructor(canvas, opts = {}) {
-      this.canvas = canvas;
-      this.ctx = canvas.getContext("2d");
-      this.color = opts.color || "#00e676";
-      this.fill = opts.fill || "rgba(0,230,118,0.12)";
-      this.max = opts.max ?? null;     // feste Achse, sonst Auto-Scale
-      this.min = opts.min ?? null;
-      this.pad = opts.pad ?? 0.12;     // Auto-Scale-Polster
+      this.canvas = canvas; this.ctx = canvas.getContext("2d");
+      this.color = opts.color || "#c3f400"; this.fill = opts.fill || "rgba(195,244,0,0.12)";
+      this.min = opts.min ?? null; this.max = opts.max ?? null; this.pad = opts.pad ?? 0.12;
       this.data = [];
       this._resize = this._resize.bind(this);
       window.addEventListener("resize", this._resize);
@@ -362,92 +418,45 @@
     }
     _resize() {
       const dpr = window.devicePixelRatio || 1;
-      const w = this.canvas.clientWidth || 300;
-      const h = this.canvas.clientHeight || 110;
-      this.canvas.width = Math.round(w * dpr);
-      this.canvas.height = Math.round(h * dpr);
+      const w = this.canvas.clientWidth || 300, h = this.canvas.clientHeight || 96;
+      this.canvas.width = Math.round(w * dpr); this.canvas.height = Math.round(h * dpr);
       this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      this.W = w; this.H = h;
-      this.draw();
+      this.W = w; this.H = h; this.draw();
     }
-    push(v) {
-      if (v == null || isNaN(v)) return;
-      this.data.push(v);
-      if (this.data.length > CFG.CHART_POINTS) this.data.shift();
-      this.draw();
-    }
+    push(v) { if (v == null || isNaN(v)) return; this.data.push(v); if (this.data.length > CFG.CHART_POINTS) this.data.shift(); this.draw(); }
     pushMany(arr) {
       let added = false;
-      for (const v of arr) {
-        if (v == null || isNaN(v)) continue;
-        this.data.push(v);
-        if (this.data.length > CFG.CHART_POINTS) this.data.shift();
-        added = true;
-      }
-      if (added) this.draw();   // nur einmal zeichnen pro Frame
+      for (const v of arr) { if (v == null || isNaN(v)) continue; this.data.push(v); if (this.data.length > CFG.CHART_POINTS) this.data.shift(); added = true; }
+      if (added) this.draw();
     }
     clear() { this.data = []; this.draw(); }
     draw() {
-      const ctx = this.ctx, W = this.W, H = this.H;
-      if (!W || !H) return;
+      const ctx = this.ctx, W = this.W, H = this.H; if (!W || !H) return;
       ctx.clearRect(0, 0, W, H);
-
-      // Gitterlinien
-      ctx.strokeStyle = "rgba(255,255,255,0.05)";
-      ctx.lineWidth = 1;
-      for (let i = 1; i < 4; i++) {
-        const y = (H / 4) * i;
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-      }
+      ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.lineWidth = 1;
+      for (let i = 1; i < 4; i++) { const y = (H / 4) * i; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
       if (this.data.length < 2) return;
-
-      // Wertebereich bestimmen
       let lo, hi;
       if (this.min != null && this.max != null) { lo = this.min; hi = this.max; }
-      else {
-        lo = Math.min(...this.data); hi = Math.max(...this.data);
-        const span = (hi - lo) || 1; lo -= span * this.pad; hi += span * this.pad;
-      }
-      const range = (hi - lo) || 1;
-      const n = this.data.length;
-      const dx = W / (CFG.CHART_POINTS - 1);
-      const x0 = W - (n - 1) * dx; // rechtsbündig einrollen
+      else { lo = Math.min(...this.data); hi = Math.max(...this.data); const sp = (hi - lo) || 1; lo -= sp * this.pad; hi += sp * this.pad; }
+      const range = (hi - lo) || 1, n = this.data.length, dx = W / (CFG.CHART_POINTS - 1), x0 = W - (n - 1) * dx;
       const xy = (i) => [x0 + i * dx, H - ((this.data[i] - lo) / range) * (H - 8) - 4];
-
-      // Flächen-Füllung
-      ctx.beginPath();
-      ctx.moveTo(...xy(0));
+      ctx.beginPath(); ctx.moveTo(...xy(0));
       for (let i = 1; i < n; i++) ctx.lineTo(...xy(i));
       const last = xy(n - 1), first = xy(0);
       ctx.lineTo(last[0], H); ctx.lineTo(first[0], H); ctx.closePath();
       ctx.fillStyle = this.fill; ctx.fill();
-
-      // Linie
       ctx.beginPath(); ctx.moveTo(...xy(0));
       for (let i = 1; i < n; i++) ctx.lineTo(...xy(i));
-      ctx.strokeStyle = this.color; ctx.lineWidth = 2.5;
-      ctx.lineJoin = "round"; ctx.lineCap = "round";
-      ctx.shadowColor = this.color; ctx.shadowBlur = 8;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-
-      // Aktueller Punkt
-      ctx.beginPath(); ctx.arc(last[0], last[1], 3.5, 0, Math.PI * 2);
-      ctx.fillStyle = this.color; ctx.fill();
+      ctx.strokeStyle = this.color; ctx.lineWidth = 2.5; ctx.lineJoin = "round"; ctx.lineCap = "round";
+      ctx.shadowColor = this.color; ctx.shadowBlur = 8; ctx.stroke(); ctx.shadowBlur = 0;
+      ctx.beginPath(); ctx.arc(last[0], last[1], 3.5, 0, Math.PI * 2); ctx.fillStyle = this.color; ctx.fill();
     }
   }
+  const hrChart = new RollingChart($("hrChart"), { color: "#c3f400", fill: "rgba(195,244,0,0.12)", min: 40, max: 190 });
+  const rrChart = new RollingChart($("rrChart"), { color: "#ccff00", fill: "rgba(204,255,0,0.10)" });
 
-  const hrChart = new RollingChart($("hrChart"), { color: "#00e676", fill: "rgba(0,230,118,0.12)", min: 40, max: 190 });
-  const rrChart = new RollingChart($("rrChart"), { color: "#00e5ff", fill: "rgba(0,229,255,0.10)" });
-
-  /* =======================================================================
-     BLE-Parsing — Heart Rate Measurement (0x2A37), Bluetooth-Spec-konform
-     Byte 0 = Flags:
-       bit0 = HR-Format (0=UINT8, 1=UINT16)
-       bit1+2 = Sensor-Contact (supported/detected)
-       bit3 = Energy Expended vorhanden (UINT16, MUSS vor RR übersprungen werden!)
-       bit4 = RR-Intervalle vorhanden (Folge von UINT16, Einheit 1/1024 s)
-     ======================================================================= */
+  /* ============================ BLE-Parsing (Spec-konform) ============================ */
   function parseHeartRate(dataview) {
     const flags = dataview.getUint8(0);
     const hr16 = (flags & 0x01) !== 0;
@@ -455,499 +464,387 @@
     const contactDetected = (flags & 0x02) !== 0;
     const energyPresent = (flags & 0x08) !== 0;
     const rrPresent = (flags & 0x10) !== 0;
-
-    let i = 1;
-    let bpm;
-    if (hr16) { bpm = dataview.getUint16(i, /*littleEndian*/ true); i += 2; }
-    else { bpm = dataview.getUint8(i); i += 1; }
-
-    if (energyPresent) i += 2; // Energy Expended (UINT16) überspringen
-
+    let i = 1, bpm;
+    if (hr16) { bpm = dataview.getUint16(i, true); i += 2; } else { bpm = dataview.getUint8(i); i += 1; }
+    if (energyPresent) i += 2;
     const rr = [];
-    if (rrPresent) {
-      // Restliche Bytes paarweise als UINT16 lesen (solange ein volles Paar passt)
-      for (; i + 2 <= dataview.byteLength; i += 2) {
-        const raw = dataview.getUint16(i, true);          // Einheit: 1/1024 s
-        rr.push(Math.round(raw * 1000 / 1024));           // -> Millisekunden
-      }
-    }
+    if (rrPresent) { for (; i + 2 <= dataview.byteLength; i += 2) { const raw = dataview.getUint16(i, true); rr.push(Math.round(raw * 1000 / 1024)); } }
     return { bpm, rr, contactSupported, contactDetected };
   }
 
-  /* =======================================================================
-     Datenfluss: neue HR-Messung verarbeiten
-     ======================================================================= */
+  /* ============================ Profil / Zonen / Kalorien ============================ */
+  function loadProfile() {
+    try {
+      const p = JSON.parse(localStorage.getItem("whoopi-profile") || "{}");
+      state.profile = { age: p.age ?? null, weight: p.weight ?? null, sex: p.sex || "m", maxHr: p.maxHr ?? null };
+    } catch (_) {}
+    els.pfAge.value = state.profile.age ?? "";
+    els.pfWeight.value = state.profile.weight ?? "";
+    els.pfSex.value = state.profile.sex;
+    els.pfMaxHr.value = state.profile.maxHr ?? "";
+    renderZones();
+  }
+  function saveProfile() {
+    const age = parseInt(els.pfAge.value, 10);
+    const weight = parseInt(els.pfWeight.value, 10);
+    state.profile = {
+      age: isNaN(age) ? null : age,
+      weight: isNaN(weight) ? null : weight,
+      sex: els.pfSex.value === "f" ? "f" : "m",
+      maxHr: els.pfMaxHr.value ? parseInt(els.pfMaxHr.value, 10) : null
+    };
+    localStorage.setItem("whoopi-profile", JSON.stringify(state.profile));
+    els.profileHint.textContent = "✓ Gespeichert";
+    setTimeout(() => { els.profileHint.textContent = ""; }, 2500);
+    renderZones();
+  }
+  function maxHr() { return state.profile.maxHr || (state.profile.age ? 220 - state.profile.age : null); }
+  // index 0..4 -> Z5..Z1 (passend zu ZONES-Reihenfolge), oder -1 wenn unter Z1 / keine maxHR
+  function zoneIndex(bpm) {
+    const m = maxHr(); if (!m) return -1;
+    const pct = bpm / m;
+    for (let i = 0; i < ZONES.length; i++) if (pct >= ZONES[i].min) return i;
+    return -1;
+  }
+  // Kalorien pro Minute (Keytel-Formel), benötigt Alter+Gewicht
+  function kcalPerMin(bpm) {
+    const { age, weight, sex } = state.profile;
+    if (!age || !weight || bpm <= 0) return 0;
+    const v = sex === "f"
+      ? (-20.4022 + 0.4472 * bpm - 0.1263 * weight + 0.074 * age)
+      : (-55.0969 + 0.6309 * bpm + 0.1988 * weight + 0.2017 * age);
+    return Math.max(0, v / 4.184);
+  }
+
+  function renderZones() {
+    const m = maxHr();
+    if (!m) { els.zones.innerHTML = ""; els.zoneHint.classList.remove("hidden"); return; }
+    els.zoneHint.classList.add("hidden");
+    const times = (state.session && state.session.zoneSec) || [0, 0, 0, 0, 0];
+    const total = times.reduce((a, b) => a + b, 0) || 1;
+    els.zones.innerHTML = ZONES.map((z, i) => {
+      const lo = Math.round(m * z.min);
+      const hi = i === 0 ? m : Math.round(m * ZONES[i - 1].min) - 1;
+      const pct = Math.round((times[i] / total) * 100);
+      return '<div class="zone-row"><div class="zl"><span>' + z.name + ' · ' + lo + (i === 0 ? '+' : '–' + hi) + '</span><span>' + fmtClock(times[i]) + '</span></div>' +
+             '<div class="zone-bar"><div style="width:' + pct + '%;background:' + z.color + '"></div></div></div>';
+    }).join("");
+  }
+
+  /* ============================ Datenfluss ============================ */
   function onMeasurement({ bpm, rr, contactSupported, contactDetected }) {
     const t = Date.now();
-
-    // BPM-Anzeige + Puls-Animation (0 = kein Hautkontakt -> letzten Wert behalten)
     if (bpm > 0) {
-      els.bpmValue.textContent = bpm;
-      els.hrNow.textContent = bpm;
-      triggerBeat(bpm);
-      hrChart.push(bpm);
+      els.bpmValue.textContent = bpm; els.hrNow.textContent = bpm;
+      triggerBeat(bpm); hrChart.push(bpm);
     }
-
-    // RR / HRV
     if (rr.length) {
       const lastRR = rr[rr.length - 1];
-      els.rrVal.textContent = lastRR + " ms";
-      els.rrNow.textContent = lastRR;
-      els.rrSub.textContent = "letztes RR-Intervall";
+      els.rrVal.textContent = lastRR + " ms"; els.rrNow.textContent = lastRR; els.rrSub.textContent = "letztes RR-Intervall";
       rrChart.pushMany(rr);
     } else if (els.rrVal.textContent === "–" || els.rrVal.textContent === "––") {
-      els.rrVal.textContent = "n/a";
-      els.rrSub.textContent = "Gerät sendet keine RR-Daten";
+      els.rrVal.textContent = "n/a"; els.rrSub.textContent = "Gerät sendet kein RR";
     }
+    if (contactSupported) { els.signalVal.textContent = contactDetected ? "OK" : "—"; els.signalSub.textContent = contactDetected ? "Hautkontakt" : "kein Kontakt"; }
+    else { els.signalVal.textContent = "n/a"; els.signalSub.textContent = "nicht unterstützt"; }
 
-    // Sensor-Kontakt (optionaler Hinweis)
-    if (contactSupported && !contactDetected) {
-      els.statusVal.textContent = "Kein Hautkontakt";
-    } else if (state.sessionActive) {
-      els.statusVal.textContent = state.demo ? "Demo läuft" : "Verbunden";
-    }
-
-    // In Session aufzeichnen
-    if (state.sessionActive && state.session) {
-      state.session.samples.push({ t, bpm, rr: rr.length ? rr[rr.length - 1] : null });
+    if (state.sessionActive && state.session && bpm > 0) {
+      const s = state.session;
+      s.samples.push({ t, bpm, rr: rr.length ? rr[rr.length - 1] : null });
+      // Zonen-Zeit & Kalorien akkumulieren (Annahme ~1 Sample/Sekunde)
+      const dt = s._lastT ? Math.min(5, (t - s._lastT) / 1000) : 1; s._lastT = t;
+      const zi = zoneIndex(bpm); if (zi >= 0) s.zoneSec[zi] += dt;
+      s.kcal += kcalPerMin(bpm) * (dt / 60);
+      els.kcalSub.textContent = s.kcal >= 1 ? Math.round(s.kcal) + " kcal" : "– kcal";
+      if (maxHr()) renderZones();
     }
   }
 
-  // Glüh-/Puls-Effekt synchron zur Herzfrequenz
   function triggerBeat(bpm) {
-    if (bpm > 0) {
-      const beatSec = Math.min(2, Math.max(0.3, 60 / bpm));
-      els.hero.style.setProperty("--beat", beatSec + "s");
-      els.hero.classList.remove("idle");
-    }
-    els.bpmValue.classList.add("beat");
+    if (bpm > 0) { els.hero.style.setProperty("--beat", Math.min(2, Math.max(0.3, 60 / bpm)) + "s"); els.hero.classList.remove("idle"); }
+    els.bpmValue.classList.add("flash");
     clearTimeout(state.beatTimer);
-    state.beatTimer = setTimeout(() => els.bpmValue.classList.remove("beat"), 140);
+    state.beatTimer = setTimeout(() => els.bpmValue.classList.remove("flash"), 140);
   }
 
-  /* =======================================================================
-     Web-Bluetooth: Verbinden / Trennen
-     ======================================================================= */
-  function bleSupported() {
-    return (typeof navigator !== "undefined") && !!navigator.bluetooth;
-  }
+  /* ============================ Web-Bluetooth ============================ */
+  function bleSupported() { return (typeof navigator !== "undefined") && !!navigator.bluetooth; }
 
   async function connect() {
     if (state.demo) stopDemo();
     if (!bleSupported()) {
-      showBanner("⚠️ Dieser Browser unterstützt Web Bluetooth nicht. Auf dem iPhone bitte Bluefy oder BLE Link verwenden — normales Safari/Chrome auf iOS geht leider nicht.", "error");
-      console.error("[WHOOPI] navigator.bluetooth nicht verfügbar.");
-      return;
+      showBanner("⚠️ Dieser Browser kann kein Web Bluetooth. Auf dem iPhone bitte Bluefy oder BLE Link nutzen (Safari/Chrome auf iOS geht nicht).", "error");
+      console.error("[WHOOPI] navigator.bluetooth fehlt."); return;
     }
     try {
-      hideBanner();
-      setConnState("connecting");
-      console.log("[WHOOPI] requestDevice …");
-      // Mehrere Filter (OR): Name 'WHOOPI…' ODER Geräte mit Heart-Rate-Service.
+      hideBanner(); setConnState("connecting"); console.log("[WHOOPI] requestDevice …");
       state.device = await navigator.bluetooth.requestDevice({
         filters: [{ namePrefix: CFG.NAME_PREFIX }, { services: [CFG.HR_SERVICE] }],
         optionalServices: [CFG.HR_SERVICE, CFG.BATT_SERVICE]
       });
-      console.log("[WHOOPI] Gerät gewählt:", state.device.name || "(ohne Namen)");
-
+      console.log("[WHOOPI] Gerät:", state.device.name || "(ohne Namen)");
       state.device.addEventListener("gattserverdisconnected", onDisconnected);
-
       state.server = await state.device.gatt.connect();
-      console.log("[WHOOPI] GATT verbunden.");
       setConnState("connected");
-
-      await subscribeHeartRate();
-      await setupBattery();
-
+      await subscribeHeartRate(); await setupBattery();
       startSession();
-      els.connectBtn.textContent = "Trennen";
-      els.finishBtn.disabled = false;
+      els.connectBtn.textContent = "Trennen"; els.finishBtn.disabled = false;
       showBanner("✅ Verbunden mit " + (state.device.name || "Gerät") + ". Aufzeichnung läuft.", "info");
       setTimeout(hideBanner, 4000);
     } catch (err) {
-      if (err && err.name === "NotFoundError") {
-        // Nutzer hat den Geräte-Dialog abgebrochen
-        setConnState("disconnected");
-        console.log("[WHOOPI] Geräteauswahl abgebrochen.");
-        return;
-      }
-      console.error("[WHOOPI] Verbindungsfehler:", err);
-      setConnState("error");
+      if (err && err.name === "NotFoundError") { setConnState("disconnected"); console.log("[WHOOPI] Auswahl abgebrochen."); return; }
+      console.error("[WHOOPI] Verbindungsfehler:", err); setConnState("error");
       showBanner("❌ Verbindung fehlgeschlagen: " + (err && err.message ? err.message : err), "error");
     }
   }
-
   async function subscribeHeartRate() {
     const svc = await state.server.getPrimaryService(CFG.HR_SERVICE);
     state.hrChar = await svc.getCharacteristic(CFG.HR_CHAR);
     await state.hrChar.startNotifications();
     state.hrChar.addEventListener("characteristicvaluechanged", (e) => {
-      try { onMeasurement(parseHeartRate(e.target.value)); }
-      catch (err) { console.error("[WHOOPI] HR-Parsing-Fehler:", err); }
+      try { onMeasurement(parseHeartRate(e.target.value)); } catch (err) { console.error("[WHOOPI] HR-Parsing:", err); }
     });
-    console.log("[WHOOPI] Heart-Rate-Notifications aktiv.");
+    console.log("[WHOOPI] HR-Notifications aktiv.");
   }
-
   async function setupBattery() {
     try {
       const svc = await state.server.getPrimaryService(CFG.BATT_SERVICE);
       state.battChar = await svc.getCharacteristic(CFG.BATT_CHAR);
       await readBattery();
-      // Manche Geräte senden Batterie-Notifications, viele nicht -> zusätzlich pollen.
       try {
         await state.battChar.startNotifications();
-        state.battChar.addEventListener("characteristicvaluechanged", (e) => {
-          els.battVal.textContent = e.target.value.getUint8(0) + " %";
-        });
-      } catch (_) { /* keine Notifications -> nur Polling */ }
+        state.battChar.addEventListener("characteristicvaluechanged", (e) => { els.battVal.textContent = e.target.value.getUint8(0) + "%"; });
+      } catch (_) {}
       state.battTimer = setInterval(readBattery, CFG.BATT_POLL_MS);
-    } catch (err) {
-      console.warn("[WHOOPI] Batterie-Service nicht verfügbar:", err && err.message);
-      els.battVal.textContent = "n/a";
-    }
+    } catch (err) { console.warn("[WHOOPI] Batterie n/a:", err && err.message); els.battVal.textContent = "n/a"; }
   }
-
-  async function readBattery() {
-    try {
-      const v = await state.battChar.readValue();
-      els.battVal.textContent = v.getUint8(0) + " %";
-    } catch (err) { console.warn("[WHOOPI] Batterie lesen fehlgeschlagen:", err && err.message); }
-  }
+  async function readBattery() { try { const v = await state.battChar.readValue(); els.battVal.textContent = v.getUint8(0) + "%"; } catch (err) { console.warn("[WHOOPI] Batterie lesen:", err && err.message); } }
 
   function onDisconnected() {
     console.warn("[WHOOPI] Verbindung verloren.");
     setConnState("error");
-    showBanner("⚠️ Verbindung zum Gerät verloren. Session wurde gespeichert.", "warn");
-    finishSession(false); // ohne Export automatisch sichern
-    cleanupConnection();
-    els.connectBtn.textContent = "Connect WHOOPI";
-    els.finishBtn.disabled = true;
-    els.hero.classList.add("idle");
+    showBanner("⚠️ Verbindung verloren. Session wurde gespeichert.", "warn");
+    finishSession(false); cleanupConnection();
+    els.connectBtn.textContent = "WHOOPI verbinden"; els.finishBtn.disabled = true; els.hero.classList.add("idle");
   }
-
-  function cleanupConnection() {
-    if (state.battTimer) { clearInterval(state.battTimer); state.battTimer = null; }
-    state.hrChar = null; state.battChar = null; state.server = null;
-  }
-
+  function cleanupConnection() { if (state.battTimer) { clearInterval(state.battTimer); state.battTimer = null; } state.hrChar = null; state.battChar = null; state.server = null; }
   async function disconnect() {
-    console.log("[WHOOPI] Trenne …");
     finishSession(false);
-    try {
-      if (state.device && state.device.gatt && state.device.gatt.connected) {
-        state.device.gatt.disconnect();
-      }
-    } catch (err) { console.warn(err); }
-    cleanupConnection();
-    setConnState("disconnected");
-    els.connectBtn.textContent = "Connect WHOOPI";
-    els.finishBtn.disabled = true;
-    els.hero.classList.add("idle");
+    try { if (state.device && state.device.gatt && state.device.gatt.connected) state.device.gatt.disconnect(); } catch (err) { console.warn(err); }
+    cleanupConnection(); setConnState("disconnected");
+    els.connectBtn.textContent = "WHOOPI verbinden"; els.finishBtn.disabled = true; els.hero.classList.add("idle");
   }
 
-  /* =======================================================================
-     Session-Verwaltung + Workout-Timer
-     ======================================================================= */
+  /* ============================ Session + Timer ============================ */
   let timerInt = null;
   function startSession() {
-    state.session = { id: "s_" + Date.now(), start: Date.now(), samples: [], demo: state.demo };
+    state.session = { id: "s_" + Date.now(), start: Date.now(), samples: [], zoneSec: [0, 0, 0, 0, 0], kcal: 0, _lastT: 0, demo: state.demo };
     state.sessionActive = true;
     startTimer();
+    renderZones();
     if (state.autosaveTimer) clearInterval(state.autosaveTimer);
     state.autosaveTimer = setInterval(() => persistSession(state.session, true), CFG.AUTOSAVE_MS);
   }
-
+  function fmtClock(sec) { sec = Math.floor(sec); const m = Math.floor(sec / 60), s = sec % 60; return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0"); }
   function startTimer() {
     const pad = (n) => String(n).padStart(2, "0");
     const tick = () => {
       if (!state.sessionActive || !state.session) return;
       const sec = Math.floor((Date.now() - state.session.start) / 1000);
-      const h = Math.floor(sec / 3600);
-      const m = Math.floor((sec % 3600) / 60);   // Minuten innerhalb der Stunde
-      const s = sec % 60;
+      const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
       els.timerVal.textContent = h > 0 ? (h + ":" + pad(m) + ":" + pad(s)) : (pad(m) + ":" + pad(s));
+      const zt = state.session.zoneSec.reduce((a, b) => a + b, 0);
+      els.zoneTotal.textContent = fmtClock(zt);
     };
-    clearInterval(timerInt);
-    tick();                              // sofort einmal anzeigen
-    timerInt = setInterval(tick, 1000);  // 1×/s statt 60 fps -> spart Akku
+    clearInterval(timerInt); tick(); timerInt = setInterval(tick, 1000);
   }
-
-  // Session beenden: in DB sichern, optional CSV exportieren
   async function finishSession(doExport) {
     if (!state.sessionActive || !state.session) return;
     state.sessionActive = false;
     clearInterval(timerInt);
     if (state.autosaveTimer) { clearInterval(state.autosaveTimer); state.autosaveTimer = null; }
-
-    const sess = state.session;
-    sess.end = Date.now();
-    if (sess.samples.length === 0) {
-      console.log("[WHOOPI] Leere Session — wird nicht gespeichert.");
-      state.session = null;
-      await renderHistory();
-      return;
-    }
+    const sess = state.session; sess.end = Date.now();
+    if (sess.samples.length === 0) { state.session = null; await renderHistory(); return; }
     const summary = await persistSession(sess, false);
-    state.session = null;
-    await renderHistory();
+    state.session = null; await renderHistory();
     if (doExport) exportCSV(summary || sess);
   }
 
-  /* =======================================================================
-     IndexedDB-Speicherung (Verlauf)
-     ======================================================================= */
+  /* ============================ IndexedDB ============================ */
   const DB = { name: "whoopi-db", store: "sessions", _db: null };
   function openDB() {
     return new Promise((resolve, reject) => {
       if (DB._db) return resolve(DB._db);
       const req = indexedDB.open(DB.name, 1);
-      req.onupgradeneeded = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains(DB.store)) {
-          db.createObjectStore(DB.store, { keyPath: "id" });
-        }
-      };
+      req.onupgradeneeded = () => { const db = req.result; if (!db.objectStoreNames.contains(DB.store)) db.createObjectStore(DB.store, { keyPath: "id" }); };
       req.onsuccess = () => { DB._db = req.result; resolve(DB._db); };
       req.onerror = () => reject(req.error);
     });
   }
-  function dbPut(rec) {
-    return openDB().then((db) => new Promise((res, rej) => {
-      const tx = db.transaction(DB.store, "readwrite");
-      tx.objectStore(DB.store).put(rec);
-      tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error);
-    }));
-  }
-  function dbAll() {
-    return openDB().then((db) => new Promise((res, rej) => {
-      const tx = db.transaction(DB.store, "readonly");
-      const rq = tx.objectStore(DB.store).getAll();
-      rq.onsuccess = () => res(rq.result || []); rq.onerror = () => rej(rq.error);
-    }));
-  }
-  function dbDel(id) {
-    return openDB().then((db) => new Promise((res, rej) => {
-      const tx = db.transaction(DB.store, "readwrite");
-      tx.objectStore(DB.store).delete(id);
-      tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error);
-    }));
-  }
-  function dbClear() {
-    return openDB().then((db) => new Promise((res, rej) => {
-      const tx = db.transaction(DB.store, "readwrite");
-      tx.objectStore(DB.store).clear();
-      tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error);
-    }));
-  }
+  function dbPut(rec) { return openDB().then((db) => new Promise((res, rej) => { const tx = db.transaction(DB.store, "readwrite"); tx.objectStore(DB.store).put(rec); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); })); }
+  function dbAll() { return openDB().then((db) => new Promise((res, rej) => { const tx = db.transaction(DB.store, "readonly"); const rq = tx.objectStore(DB.store).getAll(); rq.onsuccess = () => res(rq.result || []); rq.onerror = () => rej(rq.error); })); }
+  function dbDel(id) { return openDB().then((db) => new Promise((res, rej) => { const tx = db.transaction(DB.store, "readwrite"); tx.objectStore(DB.store).delete(id); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); })); }
+  function dbClear() { return openDB().then((db) => new Promise((res, rej) => { const tx = db.transaction(DB.store, "readwrite"); tx.objectStore(DB.store).clear(); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); })); }
 
-  // Kennzahlen berechnen + speichern
   async function persistSession(sess, isAutosave) {
     const bpms = sess.samples.map((s) => s.bpm).filter((b) => b > 0);
     const rrs = sess.samples.map((s) => s.rr).filter((r) => r != null);
     const rec = {
-      id: sess.id,
-      start: sess.start,
-      end: sess.end || Date.now(),
-      demo: !!sess.demo,
+      id: sess.id, start: sess.start, end: sess.end || Date.now(), demo: !!sess.demo,
       count: sess.samples.length,
       avg: bpms.length ? Math.round(bpms.reduce((a, b) => a + b, 0) / bpms.length) : 0,
-      min: bpms.length ? Math.min(...bpms) : 0,
-      max: bpms.length ? Math.max(...bpms) : 0,
-      rrCount: rrs.length,
+      min: bpms.length ? Math.min(...bpms) : 0, max: bpms.length ? Math.max(...bpms) : 0,
+      rrCount: rrs.length, kcal: Math.round(sess.kcal || 0), zoneSec: sess.zoneSec ? sess.zoneSec.slice() : [0,0,0,0,0],
       samples: sess.samples
     };
-    try { await dbPut(rec); }
-    catch (err) { console.error("[WHOOPI] Speichern fehlgeschlagen:", err); }
+    try { await dbPut(rec); } catch (err) { console.error("[WHOOPI] Speichern:", err); }
     if (!isAutosave) console.log("[WHOOPI] Session gespeichert:", rec.id, "(" + rec.count + " Punkte)");
     return rec;
   }
 
-  function fmtDuration(ms) {
-    const sec = Math.floor(ms / 1000);
-    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
-    if (h > 0) return h + "h " + m + "m";
-    if (m > 0) return m + "m " + s + "s";
-    return s + "s";
-  }
-  function fmtDate(ts) {
-    const d = new Date(ts);
-    return d.toLocaleDateString("de-DE", { day: "2-digit", month: "short" }) + " · " +
-           d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
-  }
+  function fmtDuration(ms) { const sec = Math.floor(ms / 1000), h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60; if (h > 0) return h + "h " + m + "m"; if (m > 0) return m + "m " + s + "s"; return s + "s"; }
+  function fmtDate(ts) { const d = new Date(ts); return d.toLocaleDateString("de-DE", { day: "2-digit", month: "short" }) + " · " + d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }); }
 
   async function renderHistory() {
-    let sessions;
-    try { sessions = await dbAll(); }
-    catch (err) { console.error("[WHOOPI] Verlauf laden fehlgeschlagen:", err); return; }
+    let sessions; try { sessions = await dbAll(); } catch (err) { console.error("[WHOOPI] Verlauf:", err); return; }
     sessions.sort((a, b) => b.start - a.start);
-
-    els.clearHist.classList.toggle("hidden", sessions.length === 0);
-    if (sessions.length === 0) {
-      els.history.innerHTML = '<div class="empty">Noch keine Aufzeichnungen.<br>Verbinde dein WHOOPI oder starte den Demo-Modus.</div>';
-      return;
-    }
+    els.histCount.textContent = sessions.length ? sessions.length + " gesamt" : "";
+    if (!sessions.length) { els.history.innerHTML = '<div class="empty">Noch keine Aufzeichnungen.<br>Verbinde dein WHOOPI oder starte den Demo-Modus.</div>'; return; }
     els.history.innerHTML = "";
     for (const s of sessions) {
       const dur = (s.end || s.start) - s.start;
       const item = document.createElement("div");
-      item.className = "hist-item";
+      item.className = "card hist-item";
       item.innerHTML =
-        '<div class="hist-main">' +
-          '<div class="hist-date">' + fmtDate(s.start) + (s.demo ? ' <span style="color:var(--warn)">· Demo</span>' : '') + '</div>' +
-          '<div class="hist-meta">' + fmtDuration(dur) + ' · ' + s.count + ' Messpunkte' + (s.rrCount ? ' · ' + s.rrCount + ' RR' : '') + '</div>' +
-        '</div>' +
-        '<div class="hist-stats">' +
-          '<div class="hs"><b style="color:var(--accent)">' + s.avg + '</b><span>Ø BPM</span></div>' +
-          '<div class="hs"><b>' + s.max + '</b><span>MAX</span></div>' +
-        '</div>' +
+        '<div class="hist-ico"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg></div>' +
+        '<div class="hist-main"><h4>' + fmtDate(s.start) + (s.demo ? ' · <span style="color:#ffce5c">Demo</span>' : '') + '</h4>' +
+          '<p>' + fmtDuration(dur) + ' · ' + s.count + ' Punkte' + (s.kcal ? ' · ' + s.kcal + ' kcal' : '') + (s.rrCount ? ' · ' + s.rrCount + ' RR' : '') + '</p></div>' +
+        '<div class="hist-stat"><div class="b data lime">' + s.avg + '</div><div class="s">Ø · max ' + s.max + '</div></div>' +
         '<div class="hist-actions">' +
-          '<button class="icon-btn dl" data-dl="' + s.id + '">CSV</button>' +
-          '<button class="icon-btn del" data-del="' + s.id + '">✕</button>' +
+          '<button class="icon-btn" data-dl="' + s.id + '" title="CSV"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg></button>' +
+          '<button class="icon-btn" data-del="' + s.id + '" title="Löschen"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>' +
         '</div>';
       els.history.appendChild(item);
     }
-    els.history.querySelectorAll("[data-dl]").forEach((b) =>
-      b.addEventListener("click", async () => {
-        const all = await dbAll();
-        const rec = all.find((x) => x.id === b.getAttribute("data-dl"));
-        if (rec) exportCSV(rec);
-      }));
-    els.history.querySelectorAll("[data-del]").forEach((b) =>
-      b.addEventListener("click", async () => {
-        await dbDel(b.getAttribute("data-del"));
-        await renderHistory();
-      }));
+    els.history.querySelectorAll("[data-dl]").forEach((b) => b.addEventListener("click", async () => { const all = await dbAll(); const rec = all.find((x) => x.id === b.getAttribute("data-dl")); if (rec) exportCSV(rec); }));
+    els.history.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", async () => { if (confirm("Diese Session löschen?")) { await dbDel(b.getAttribute("data-del")); await renderHistory(); } }));
   }
 
-  /* =======================================================================
-     CSV-Export (mit iOS-Share-Fallback)
-     ======================================================================= */
+  /* ============================ Export: CSV + JSON-Backup ============================ */
   function buildCSV(rec) {
     const rows = ['"Timestamp","Heart Rate (BPM)","RR-Interval (ms)"'];
-    for (const s of rec.samples) {
-      const ts = new Date(s.t).toISOString();
-      rows.push('"' + ts + '",' + (s.bpm ?? "") + ',' + (s.rr != null ? s.rr : ""));
-    }
+    for (const s of rec.samples) rows.push('"' + new Date(s.t).toISOString() + '",' + (s.bpm ?? "") + ',' + (s.rr != null ? s.rr : ""));
     return rows.join("\r\n");
   }
-
-  async function exportCSV(rec) {
-    if (!rec || !rec.samples || !rec.samples.length) {
-      showBanner("Keine Daten zum Exportieren.", "warn"); setTimeout(hideBanner, 2500); return;
-    }
-    const csv = buildCSV(rec);
-    const fname = "whoopi_" + new Date(rec.start).toISOString().slice(0, 19).replace(/[:T]/g, "-") + ".csv";
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-
-    // 1) Web Share API mit Datei (am besten für iOS/Bluefy)
+  async function shareOrDownload(blob, fname, text) {
     try {
-      const file = new File([blob], fname, { type: "text/csv" });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: "WHOOPI Session" });
-        console.log("[WHOOPI] CSV via Share exportiert.");
-        return;
-      }
-    } catch (err) { console.warn("[WHOOPI] Share nicht möglich, nutze Download:", err && err.message); }
-
-    // 2) Klassischer Download
+      const file = new File([blob], fname, { type: blob.type });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: fname }); return; }
+    } catch (err) { console.warn("[WHOOPI] Share n/a:", err && err.message); }
     try {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = fname;
-      document.body.appendChild(a); a.click(); a.remove();
+      const url = URL.createObjectURL(blob); const a = document.createElement("a");
+      a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1500);
-      console.log("[WHOOPI] CSV-Download gestartet:", fname);
     } catch (err) {
-      // 3) Letzter Fallback: in die Zwischenablage
-      try {
-        await navigator.clipboard.writeText(csv);
-        showBanner("CSV in die Zwischenablage kopiert (Download nicht möglich).", "info");
-        setTimeout(hideBanner, 4000);
-      } catch (e2) {
-        showBanner("Export fehlgeschlagen: " + (err && err.message), "error");
-      }
+      if (text) { try { await navigator.clipboard.writeText(text); showBanner("In Zwischenablage kopiert (Download nicht möglich).", "info"); setTimeout(hideBanner, 4000); return; } catch (_) {} }
+      showBanner("Export fehlgeschlagen: " + (err && err.message), "error");
     }
   }
+  async function exportCSV(rec) {
+    if (!rec || !rec.samples || !rec.samples.length) { showBanner("Keine Daten zum Export.", "warn"); setTimeout(hideBanner, 2500); return; }
+    const csv = buildCSV(rec);
+    const fname = "whoopi_" + new Date(rec.start).toISOString().slice(0, 19).replace(/[:T]/g, "-") + ".csv";
+    await shareOrDownload(new Blob([csv], { type: "text/csv;charset=utf-8;" }), fname, csv);
+    console.log("[WHOOPI] CSV exportiert:", fname);
+  }
+  async function exportBackup() {
+    let sessions; try { sessions = await dbAll(); } catch (_) { sessions = []; }
+    if (!sessions.length) { showBanner("Kein Verlauf zum Sichern.", "warn"); setTimeout(hideBanner, 2500); return; }
+    const backup = { app: "whoopi-telemetry", version: 1, exportedAt: new Date().toISOString(), profile: state.profile, sessions };
+    const fname = "whoopi-backup_" + new Date().toISOString().slice(0, 10) + ".json";
+    await shareOrDownload(new Blob([JSON.stringify(backup)], { type: "application/json" }), fname, null);
+    showBanner("✅ Backup mit " + sessions.length + " Sessions erstellt. Über das Teilen-Menü in iCloud/Proton sichern.", "info");
+    setTimeout(hideBanner, 5000);
+  }
+  async function importBackup(file) {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      const sessions = Array.isArray(data) ? data : (data.sessions || []);
+      if (!sessions.length) { showBanner("Keine Sessions in der Datei gefunden.", "warn"); setTimeout(hideBanner, 3000); return; }
+      const existing = await dbAll(); const ids = new Set(existing.map((s) => s.id));
+      let added = 0;
+      for (const s of sessions) { if (s && s.id && !ids.has(s.id)) { await dbPut(s); added++; } }
+      if (data.profile && (data.profile.age || data.profile.weight)) { state.profile = data.profile; localStorage.setItem("whoopi-profile", JSON.stringify(state.profile)); loadProfile(); }
+      await renderHistory();
+      showBanner("✅ " + added + " neue Session(s) importiert" + (sessions.length - added > 0 ? " (" + (sessions.length - added) + " bereits vorhanden)" : "") + ".", "info");
+      setTimeout(hideBanner, 5000);
+    } catch (err) { console.error("[WHOOPI] Import:", err); showBanner("❌ Import fehlgeschlagen: ungültige Datei.", "error"); setTimeout(hideBanner, 4000); }
+  }
 
-  /* =======================================================================
-     Demo-Modus (realistische Fake-Daten, kein Bluetooth nötig)
-     ======================================================================= */
+  /* ============================ Demo-Modus ============================ */
   function startDemo() {
-    if (state.server) { showBanner("Erst Gerät trennen, dann Demo starten.", "warn"); setTimeout(hideBanner, 2500); return; }
-    state.demo = true;
-    setConnState("connected");
-    els.statusVal.textContent = "Demo läuft";
-    els.battVal.textContent = "87 %";
-    els.demoBtn.textContent = "Demo stop";
-    els.connectBtn.disabled = true;
-    els.finishBtn.disabled = false;
-    showBanner("▶️ Demo-Modus: simulierte Herzfrequenz & RR-Intervalle.", "info");
-    setTimeout(hideBanner, 3500);
-
+    if (state.server) { showBanner("Erst Gerät trennen, dann Demo.", "warn"); setTimeout(hideBanner, 2500); return; }
+    state.demo = true; setConnState("demo"); els.battVal.textContent = "87%";
+    els.demoBtn.textContent = "Demo stop"; els.connectBtn.disabled = true; els.finishBtn.disabled = false;
+    showBanner("▶️ Demo-Modus: simulierte Herzfrequenz & RR.", "info"); setTimeout(hideBanner, 3500);
     startSession();
     let bpm = 72;
     state.demoTimer = setInterval(() => {
-      // Sanfter Random-Walk in plausiblem Bereich
-      bpm += (Math.random() - 0.48) * 6;
-      bpm = Math.max(52, Math.min(178, bpm));
-      const bpmR = Math.round(bpm);
-      // RR aus BPM + etwas HRV-Jitter
-      const baseRR = 60000 / bpmR;
-      const rr = [Math.round(baseRR + (Math.random() - 0.5) * 40)];
-      onMeasurement({ bpm: bpmR, rr, contactSupported: true, contactDetected: true });
+      bpm += (Math.random() - 0.48) * 6; bpm = Math.max(52, Math.min(178, bpm));
+      const b = Math.round(bpm); const baseRR = 60000 / b;
+      onMeasurement({ bpm: b, rr: [Math.round(baseRR + (Math.random() - 0.5) * 40)], contactSupported: true, contactDetected: true });
     }, 1000);
   }
-
   function stopDemo(doExport) {
     if (state.demoTimer) { clearInterval(state.demoTimer); state.demoTimer = null; }
-    state.demo = false;
-    finishSession(!!doExport);
-    els.demoBtn.textContent = "Demo";
-    els.connectBtn.disabled = false;
-    els.finishBtn.disabled = true;
-    setConnState("disconnected");
-    els.hero.classList.add("idle");
-    els.bpmValue.textContent = "––";
+    state.demo = false; finishSession(!!doExport);
+    els.demoBtn.textContent = "Demo"; els.connectBtn.disabled = false; els.finishBtn.disabled = true;
+    setConnState("disconnected"); els.hero.classList.add("idle"); els.bpmValue.textContent = "––";
   }
 
-  /* =======================================================================
-     Event-Verdrahtung + Init
-     ======================================================================= */
-  els.connectBtn.addEventListener("click", () => {
-    if (state.server) disconnect(); else connect();
-  });
-  els.demoBtn.addEventListener("click", () => {
-    if (state.demo) stopDemo(); else startDemo();
-  });
-  els.finishBtn.addEventListener("click", async () => {
-    if (state.demo) {
-      stopDemo(true);                          // Demo beenden + exportieren
-    } else {
-      await finishSession(true);
-      // Verbindung bleibt bestehen -> direkt neue Session starten
-      if (state.server) startSession(); else els.finishBtn.disabled = true;
-    }
-  });
-  els.clearHist.addEventListener("click", async () => {
-    if (confirm("Wirklich alle gespeicherten Sessions löschen?")) {
-      await dbClear(); await renderHistory();
-    }
-  });
+  /* ============================ Tabs ============================ */
+  function switchTab(tab) {
+    ["live", "history", "profile"].forEach((t) => $("tab-" + t).classList.toggle("hidden", t !== tab));
+    document.querySelectorAll("nav.bottom a").forEach((a) => a.classList.toggle("active", a.getAttribute("data-tab") === tab));
+    if (tab === "history") renderHistory();
+  }
 
-  // Beim Verlassen laufende Session sichern
-  window.addEventListener("beforeunload", () => {
-    if (state.sessionActive && state.session && state.session.samples.length) {
-      try { persistSession(state.session, true); } catch (_) {}
-    }
+  /* ============================ Persistenter Speicher ============================ */
+  async function requestPersistence() {
+    try {
+      if (navigator.storage && navigator.storage.persist) {
+        const already = await navigator.storage.persisted();
+        const granted = already || await navigator.storage.persist();
+        els.storageHint.textContent = granted
+          ? "✓ Persistenter Speicher aktiv – Daten werden nicht automatisch gelöscht."
+          : "⚠️ Speicher im Standard-Modus. iOS kann Daten nach ~7 Tagen ohne Nutzung löschen – mach regelmäßig ein Backup!";
+      } else { els.storageHint.textContent = "Hinweis: Sichere regelmäßig ein Backup."; }
+    } catch (_) { els.storageHint.textContent = "Hinweis: Sichere regelmäßig ein Backup."; }
+  }
+
+  /* ============================ Verdrahtung + Init ============================ */
+  els.connectBtn.addEventListener("click", () => { if (state.server) disconnect(); else connect(); });
+  els.demoBtn.addEventListener("click", () => { if (state.demo) stopDemo(); else startDemo(); });
+  els.finishBtn.addEventListener("click", async () => {
+    if (state.demo) { stopDemo(true); }
+    else { await finishSession(true); if (state.server) startSession(); else els.finishBtn.disabled = true; }
   });
+  els.saveProfile.addEventListener("click", saveProfile);
+  els.exportBtn.addEventListener("click", exportBackup);
+  els.importBtn.addEventListener("click", () => els.importFile.click());
+  els.importFile.addEventListener("change", (e) => { const f = e.target.files && e.target.files[0]; if (f) importBackup(f); e.target.value = ""; });
+  els.clearAll.addEventListener("click", async () => { if (confirm("Wirklich ALLE gespeicherten Sessions löschen?")) { await dbClear(); await renderHistory(); } });
+  document.querySelectorAll("nav.bottom a").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); switchTab(a.getAttribute("data-tab")); }));
+  window.addEventListener("beforeunload", () => { if (state.sessionActive && state.session && state.session.samples.length) { try { persistSession(state.session, true); } catch (_) {} } });
 
   function init() {
-    console.log("[WHOOPI] Init. Web Bluetooth verfügbar:", bleSupported());
-    if (!bleSupported()) {
-      showBanner("ℹ️ Web Bluetooth ist in diesem Browser nicht verfügbar. Du kannst die App im Demo-Modus ansehen. Für echtes Tracking auf dem iPhone: Bluefy oder BLE Link verwenden.", "warn");
-    }
+    console.log("[WHOOPI] Init. Web Bluetooth:", bleSupported());
+    if (!bleSupported()) showBanner("ℹ️ Web Bluetooth ist hier nicht verfügbar – du kannst die App im Demo-Modus ansehen. Fürs echte Tracking auf dem iPhone: Bluefy oder BLE Link.", "warn");
     setConnState("disconnected");
+    loadProfile();
     renderHistory();
+    requestPersistence();
   }
   init();
   </script>
