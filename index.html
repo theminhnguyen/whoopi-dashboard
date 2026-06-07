@@ -16,8 +16,8 @@
       --surface: #131313;
       --surface-container: #1c1b1b;
       --surface-high: #2a2a2a;
-      --glass: rgba(28, 28, 30, 0.8);
-      --border: rgba(255, 255, 255, 0.10);
+      --glass: rgba(32, 32, 36, 0.9);
+      --border: rgba(255, 255, 255, 0.14);
       --text: #e5e2e1;
       --text-dim: #c4c9ac;          /* leicht olivgrau */
       --lime: #c3f400;              /* Primär-Akzent */
@@ -521,6 +521,7 @@
     if (!m) { els.zones.innerHTML = ""; els.zoneHint.classList.remove("hidden"); return; }
     els.zoneHint.classList.add("hidden");
     const times = (state.session && state.session.zoneSec) || [0, 0, 0, 0, 0];
+    els.zoneTotal.textContent = fmtClock(times.reduce((a, b) => a + b, 0));
     const total = times.reduce((a, b) => a + b, 0) || 1;
     els.zones.innerHTML = ZONES.map((z, i) => {
       const lo = Math.round(m * z.min);
@@ -653,8 +654,6 @@
       const sec = Math.floor((Date.now() - state.session.start) / 1000);
       const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
       els.timerVal.textContent = h > 0 ? (h + ":" + pad(m) + ":" + pad(s)) : (pad(m) + ":" + pad(s));
-      const zt = state.session.zoneSec.reduce((a, b) => a + b, 0);
-      els.zoneTotal.textContent = fmtClock(zt);
     };
     clearInterval(timerInt); tick(); timerInt = setInterval(tick, 1000);
   }
@@ -789,11 +788,15 @@
     els.demoBtn.textContent = "Demo stop"; els.connectBtn.disabled = true; els.finishBtn.disabled = false;
     showBanner("▶️ Demo-Modus: simulierte Herzfrequenz & RR.", "info"); setTimeout(hideBanner, 3500);
     startSession();
-    let bpm = 72;
+    let bpm = 85, tick = 0;
     state.demoTimer = setInterval(() => {
-      bpm += (Math.random() - 0.48) * 6; bpm = Math.max(52, Math.min(178, bpm));
+      tick++;
+      // simuliertes Workout: HR folgt wellenförmig den Zonen (~95–180 BPM)
+      const target = 130 + 35 * Math.sin(tick / 25) + 12 * Math.sin(tick / 6);
+      bpm += (target - bpm) * 0.18 + (Math.random() - 0.5) * 3;
+      bpm = Math.max(60, Math.min(185, bpm));
       const b = Math.round(bpm); const baseRR = 60000 / b;
-      onMeasurement({ bpm: b, rr: [Math.round(baseRR + (Math.random() - 0.5) * 40)], contactSupported: true, contactDetected: true });
+      onMeasurement({ bpm: b, rr: [Math.round(baseRR + (Math.random() - 0.5) * 30)], contactSupported: true, contactDetected: true });
     }, 1000);
   }
   function stopDemo(doExport) {
