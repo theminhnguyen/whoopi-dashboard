@@ -311,6 +311,11 @@
         <div id="storageHint" class="sub" style="margin-top:12px;"></div>
       </div>
 
+      <div class="sec-title"><span class="caps" style="font-size:13px;">Bluetooth-Diagnose</span></div>
+      <div class="card">
+        <div id="diagOutput" class="info-box">Verbinde dein WHOOPI – hier zeige ich (nur lesend), welche Dienste &amp; Daten dein Band wirklich liefert. Das entscheidet, ob Stress-Index &amp; Vibrationsalarm machbar sind.</div>
+      </div>
+
       <div class="card" style="margin-top:14px;">
         <div class="info-box">
           <b>WHOOPI Live</b> liest nur Standard-Bluetooth (Herzfrequenz, Batterie). Schlaf-, Recovery- und Strain-Werte berechnet ausschließlich die Original-Whoop-App und sind hier bewusst nicht enthalten. Kalorien &amp; Zonen sind Schätzungen aus deiner Herzfrequenz.
@@ -349,6 +354,7 @@
     NAME_PREFIX: "WHOOPI",
     HR_SERVICE: "heart_rate", HR_CHAR: "heart_rate_measurement",
     BATT_SERVICE: "battery_service", BATT_CHAR: "battery_level",
+    WHOOP_SERVICE: "61080001-8d6d-82b8-614a-1c8cb0f8dcc6",  // proprietärer Gen4-Dienst (Diagnose)
     BATT_POLL_MS: 60000, AUTOSAVE_MS: 15000, CHART_POINTS: 150
   };
   // Zonen als % der max. HR (untere Grenze, Name, Farbe)
@@ -375,14 +381,14 @@
     pfAge: $("pfAge"), pfWeight: $("pfWeight"), pfSex: $("pfSex"), pfMaxHr: $("pfMaxHr"),
     saveProfile: $("saveProfile"), profileHint: $("profileHint"),
     exportBtn: $("exportBtn"), importBtn: $("importBtn"), importFile: $("importFile"),
-    storageHint: $("storageHint"), clearAll: $("clearAll")
+    storageHint: $("storageHint"), clearAll: $("clearAll"), diagOutput: $("diagOutput")
   };
 
   const state = {
     device: null, server: null, hrChar: null, battChar: null,
     battTimer: null, autosaveTimer: null, beatTimer: null,
     demo: false, demoTimer: null,
-    sessionActive: false, session: null,
+    sessionActive: false, session: null, rrSeen: false,
     profile: { age: null, weight: null, sex: "m", maxHr: null }
   };
 
@@ -540,6 +546,7 @@
       triggerBeat(bpm); hrChart.push(bpm);
     }
     if (rr.length) {
+      state.rrSeen = true;
       const lastRR = rr[rr.length - 1];
       els.rrVal.textContent = lastRR + " ms"; els.rrNow.textContent = lastRR; els.rrSub.textContent = "letztes RR-Intervall";
       rrChart.pushMany(rr);
@@ -581,13 +588,15 @@
       hideBanner(); setConnState("connecting"); console.log("[WHOOPI] requestDevice …");
       state.device = await navigator.bluetooth.requestDevice({
         filters: [{ namePrefix: CFG.NAME_PREFIX }, { services: [CFG.HR_SERVICE] }],
-        optionalServices: [CFG.HR_SERVICE, CFG.BATT_SERVICE]
+        optionalServices: [CFG.HR_SERVICE, CFG.BATT_SERVICE, CFG.WHOOP_SERVICE]
       });
       console.log("[WHOOPI] Gerät:", state.device.name || "(ohne Namen)");
       state.device.addEventListener("gattserverdisconnected", onDisconnected);
       state.server = await state.device.gatt.connect();
       setConnState("connected");
+      state.rrSeen = false;
       await subscribeHeartRate(); await setupBattery();
+      runDiagnostics();
       startSession();
       els.connectBtn.textContent = "Trennen"; els.finishBtn.disabled = false;
       showBanner("✅ Verbunden mit " + (state.device.name || "Gerät") + ". Aufzeichnung läuft.", "info");
@@ -620,6 +629,32 @@
     } catch (err) { console.warn("[WHOOPI] Batterie n/a:", err && err.message); els.battVal.textContent = "n/a"; }
   }
   async function readBattery() { try { const v = await state.battChar.readValue(); els.battVal.textContent = v.getUint8(0) + "%"; } catch (err) { console.warn("[WHOOPI] Batterie lesen:", err && err.message); } }
+
+  // Diagnose: prüft (nur lesend), welche Dienste & Daten das Band liefert
+  async function runDiagnostics() {
+    const lines = [
+      "Gerät: " + (state.device && state.device.name ? state.device.name : "unbekannt"),
+      "✓ Herzfrequenz-Dienst (0x180D)",
+      (state.battChar ? "✓" : "✗") + " Batterie-Dienst (0x180F)"
+    ];
+    try {
+      const svc = await state.server.getPrimaryService(CFG.WHOOP_SERVICE);
+      const chars = await svc.getCharacteristics();
+      lines.push("✓ Proprietärer WHOOPI-Dienst erreichbar (" + chars.length + " Merkmale) → Alarm evtl. möglich");
+      console.log("[WHOOPI] Proprietäre Merkmale:", chars.map((c) => c.uuid));
+    } catch (e) {
+      lines.push("✗ Proprietärer WHOOPI-Dienst nicht erreichbar → Alarm nicht möglich");
+      console.warn("[WHOOPI] Proprietärer Dienst:", e && e.message);
+    }
+    lines.push("RR-Intervalle: prüfe 10 s …");
+    els.diagOutput.innerHTML = lines.map((l) => "• " + l).join("<br>");
+    setTimeout(() => {
+      lines[lines.length - 1] = state.rrSeen
+        ? "✓ RR-Intervalle empfangen → HRV & Stress-Index sinnvoll"
+        : "✗ Keine RR-Intervalle → HRV n/a, Stress-Index nur grob aus BPM";
+      els.diagOutput.innerHTML = lines.map((l) => "• " + l).join("<br>");
+    }, 10000);
+  }
 
   function onDisconnected() {
     console.warn("[WHOOPI] Verbindung verloren.");
