@@ -34,7 +34,7 @@
       --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, system-ui, sans-serif;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    html, body { height: 100%; }
+    html, body { height: 100%; overscroll-behavior: none; }  /* kein versehentliches Pull-to-Refresh */
     body {
       font-family: var(--font);
       background:
@@ -224,8 +224,8 @@
         <span class="unit caps">BPM</span>
       </div>
 
-      <!-- Bento: HRV / Signal / Timer -->
-      <div class="grid g2 g-md-3">
+      <!-- Bento: HRV / Signal / Timer / Stress -->
+      <div class="grid g2">
         <div class="card metric">
           <div class="top"><span class="caps">HRV</span>
             <svg class="ico-sm neon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
@@ -246,6 +246,13 @@
           </div>
           <div><span id="timerVal" class="val sm data">00:00</span></div>
           <div id="kcalSub" class="sub">– kcal</div>
+        </div>
+        <div class="card metric">
+          <div class="top"><span class="caps">Stress</span>
+            <svg class="ico-sm" style="color:var(--z4)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>
+          </div>
+          <div><span id="stressVal" class="val sm data">–</span></div>
+          <div id="stressSub" class="sub">Baevsky-Index</div>
         </div>
       </div>
 
@@ -320,10 +327,9 @@
       <div class="card">
         <div id="alarmStatus" class="info-box" style="margin-bottom:14px;">Verbinde dein Gerät. Der Vibrationsalarm braucht den proprietären WHOOPI-Dienst.</div>
         <div class="field"><label for="alarmTime">Weckzeit</label><input id="alarmTime" type="time" value="07:00" /></div>
-        <div class="btns" style="margin-top:0;">
-          <button id="setAlarmBtn" class="b-primary" disabled>Wecker stellen</button>
-          <button id="testVibrateBtn" class="b-ghost" disabled>Jetzt vibrieren</button>
-        </div>
+        <button id="setAlarmBtn" class="b-primary b-wide" disabled>Wecker stellen</button>
+        <button id="alarmOffBtn" class="b-ghost b-wide hidden" style="margin-top:10px;">Wecker ausschalten</button>
+        <button id="testVibrateBtn" class="b-ghost b-wide" style="margin-top:10px;" disabled>Jetzt vibrieren (Test)</button>
       </div>
 
       <div class="card" style="margin-top:14px;">
@@ -393,14 +399,15 @@
     saveProfile: $("saveProfile"), profileHint: $("profileHint"),
     exportBtn: $("exportBtn"), importBtn: $("importBtn"), importFile: $("importFile"),
     storageHint: $("storageHint"), clearAll: $("clearAll"), diagOutput: $("diagOutput"),
-    alarmStatus: $("alarmStatus"), alarmTime: $("alarmTime"), setAlarmBtn: $("setAlarmBtn"), testVibrateBtn: $("testVibrateBtn")
+    alarmStatus: $("alarmStatus"), alarmTime: $("alarmTime"), setAlarmBtn: $("setAlarmBtn"), testVibrateBtn: $("testVibrateBtn"), alarmOffBtn: $("alarmOffBtn"),
+    stressVal: $("stressVal"), stressSub: $("stressSub")
   };
 
   const state = {
     device: null, server: null, hrChar: null, battChar: null, cmdChar: null, cmdSeq: 0,
     battTimer: null, autosaveTimer: null, beatTimer: null,
     demo: false, demoTimer: null,
-    sessionActive: false, session: null, rrSeen: false,
+    sessionActive: false, session: null, rrSeen: false, rrBuffer: [], alarmSet: null,
     profile: { age: null, weight: null, sex: "m", maxHr: null }
   };
 
@@ -533,6 +540,33 @@
       : (-55.0969 + 0.6309 * bpm + 0.1988 * weight + 0.2017 * age);
     return Math.max(0, v / 4.184);
   }
+  // Baevsky-Stress-Index aus RR-Intervallen (ms) -> 0..10 (exakt wie openwhoop/stress.rs)
+  function baevskyStress(rr) {
+    if (rr.length < 2) return null;
+    let min = Infinity, max = -Infinity, modeFreq = 0, modeBin = 0;
+    const bins = {};
+    for (const v of rr) {
+      if (v < min) min = v; if (v > max) max = v;
+      const b = Math.floor(v / 50);
+      bins[b] = (bins[b] || 0) + 1;
+      if (bins[b] > modeFreq) { modeFreq = bins[b]; modeBin = b; }
+    }
+    const vr = (max - min) / 1000;
+    if (vr < 0.0001) return 10;
+    const aMode = modeFreq / rr.length * 100, mode = modeBin * 50 + 25;
+    return Math.min(1000, Math.round(aMode / (2 * vr * (mode / 1000)))) / 100;
+  }
+  function updateStress() {
+    if (!els.stressVal) return;
+    const rr = state.rrBuffer;
+    if (rr.length < 30) { els.stressVal.textContent = "–"; els.stressVal.style.color = ""; els.stressSub.textContent = rr.length ? "sammelt… " + rr.length + "/30" : "Baevsky-Index"; return; }
+    const si = baevskyStress(rr.slice(-300));
+    if (si == null) return;
+    els.stressVal.textContent = si.toFixed(1);
+    const lvl = si < 2 ? ["entspannt", "var(--z1)"] : si < 4 ? ["moderat", "var(--lime)"] : si < 6 ? ["erhöht", "var(--z3)"] : ["hoch", "var(--z5)"];
+    els.stressVal.style.color = lvl[1];
+    els.stressSub.textContent = lvl[0] + " · Baevsky";
+  }
 
   function renderZones() {
     const m = maxHr();
@@ -559,6 +593,8 @@
     }
     if (rr.length) {
       state.rrSeen = true;
+      for (const x of rr) state.rrBuffer.push(x);
+      if (state.rrBuffer.length > 600) state.rrBuffer = state.rrBuffer.slice(-600);
       const lastRR = rr[rr.length - 1];
       els.rrVal.textContent = lastRR + " ms"; els.rrNow.textContent = lastRR; els.rrSub.textContent = "letztes RR-Intervall";
       rrChart.pushMany(rr);
@@ -710,9 +746,20 @@
     try {
       await sendWhoop(10, [byteAt(now, 0), byteAt(now, 1), byteAt(now, 2), byteAt(now, 3), 0, 0, 0, 0, 0]);   // Geräteuhr synchronisieren
       await sendWhoop(66, [0x01, byteAt(unix, 0), byteAt(unix, 1), byteAt(unix, 2), byteAt(unix, 3), 0, 0, 0, 0]); // Wecker setzen
+      state.alarmSet = d.getTime(); try { localStorage.setItem("whoopi-alarm", String(state.alarmSet)); } catch (_) {}
+      updateAlarmDisplay();
       showBanner("⏰ Wecker gestellt: " + d.toLocaleString("de-DE", { weekday: "short", hour: "2-digit", minute: "2-digit" }), "info");
       setTimeout(hideBanner, 5000);
     } catch (e) { showBanner("❌ Wecker fehlgeschlagen: " + (e && e.message), "error"); console.error("[WHOOPI] SetAlarm:", e); }
+  }
+  async function alarmOff() {
+    try { await sendWhoop(69, [0x00]); } catch (e) { console.warn("[WHOOPI] DisableAlarm:", e && e.message); } // DisableAlarm (ungetestet, aber harmlos)
+    state.alarmSet = null; try { localStorage.removeItem("whoopi-alarm"); } catch (_) {}
+    updateAlarmDisplay(); showBanner("Wecker ausgeschaltet.", "info"); setTimeout(hideBanner, 3000);
+  }
+  function updateAlarmDisplay() {
+    if (!els.alarmOffBtn) return;
+    els.alarmOffBtn.classList.toggle("hidden", !state.alarmSet);
   }
 
   function onDisconnected() {
@@ -734,6 +781,7 @@
   let timerInt = null;
   function startSession() {
     state.session = { id: "s_" + Date.now(), start: Date.now(), samples: [], zoneSec: [0, 0, 0, 0, 0], kcal: 0, _lastT: 0, demo: state.demo };
+    state.rrBuffer = [];
     state.sessionActive = true;
     startTimer();
     renderZones();
@@ -748,6 +796,7 @@
       const sec = Math.floor((Date.now() - state.session.start) / 1000);
       const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
       els.timerVal.textContent = h > 0 ? (h + ":" + pad(m) + ":" + pad(s)) : (pad(m) + ":" + pad(s));
+      if (sec % 3 === 0) updateStress();   // Stress-Index alle 3 s aktualisieren
     };
     clearInterval(timerInt); tick(); timerInt = setInterval(tick, 1000);
   }
@@ -934,6 +983,7 @@
   els.clearAll.addEventListener("click", async () => { if (confirm("Wirklich ALLE gespeicherten Sessions löschen?")) { await dbClear(); await renderHistory(); } });
   els.testVibrateBtn.addEventListener("click", testVibrate);
   els.setAlarmBtn.addEventListener("click", setAlarmAt);
+  els.alarmOffBtn.addEventListener("click", alarmOff);
   document.querySelectorAll("nav.bottom a").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); switchTab(a.getAttribute("data-tab")); }));
   window.addEventListener("beforeunload", () => { if (state.sessionActive && state.session && state.session.samples.length) { try { persistSession(state.session, true); } catch (_) {} } });
 
@@ -942,6 +992,8 @@
     if (!bleSupported()) showBanner("ℹ️ Web Bluetooth ist hier nicht verfügbar – du kannst die App im Demo-Modus ansehen. Fürs echte Tracking auf dem iPhone: Bluefy oder BLE Link.", "warn");
     setConnState("disconnected");
     loadProfile();
+    try { const a = localStorage.getItem("whoopi-alarm"); if (a) state.alarmSet = +a; } catch (_) {}
+    updateAlarmDisplay();
     renderHistory();
     requestPersistence();
   }
