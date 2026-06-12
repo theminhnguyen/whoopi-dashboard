@@ -370,8 +370,10 @@
     NAME_PREFIX: "WHOOPI",
     HR_SERVICE: "heart_rate", HR_CHAR: "heart_rate_measurement",
     BATT_SERVICE: "battery_service", BATT_CHAR: "battery_level",
-    WHOOP_SERVICE: "61080001-8d6d-82b8-614a-1c8cb0f8dcc6",  // proprietärer Gen4-Dienst
-    WHOOP_CMD_CHAR: "61080002-8d6d-82b8-614a-1c8cb0f8dcc6", // cmd-to-strap (Alarm schreiben)
+    WHOOP_SERVICE: "61080001-8d6d-82b8-614a-1c8cb0f8dcc6",  // proprietärer Dienst Whoop 4.0
+    WHOOP_CMD_CHAR: "61080002-8d6d-82b8-614a-1c8cb0f8dcc6", // cmd-to-strap 4.0
+    WHOOP5_SERVICE: "fd4b0001-cce1-4033-93ce-002d5875f58a", // proprietärer Dienst Whoop 5.0 (Maverick)
+    WHOOP5_CMD_CHAR: "fd4b0002-cce1-4033-93ce-002d5875f58a", // cmd-to-strap 5.0
     BATT_POLL_MS: 60000, AUTOSAVE_MS: 15000, CHART_POINTS: 150
   };
   // Zonen als % der max. HR (untere Grenze, Name, Farbe)
@@ -404,7 +406,7 @@
   };
 
   const state = {
-    device: null, server: null, hrChar: null, battChar: null, cmdChar: null, cmdSeq: 0,
+    device: null, server: null, hrChar: null, battChar: null, cmdChar: null, cmdSeq: 0, generation: null,
     battTimer: null, autosaveTimer: null, beatTimer: null,
     demo: false, demoTimer: null,
     sessionActive: false, session: null, rrSeen: false, rrBuffer: [], alarmSet: null,
@@ -636,7 +638,7 @@
       hideBanner(); setConnState("connecting"); console.log("[WHOOPI] requestDevice …");
       state.device = await navigator.bluetooth.requestDevice({
         filters: [{ namePrefix: CFG.NAME_PREFIX }, { services: [CFG.HR_SERVICE] }],
-        optionalServices: [CFG.HR_SERVICE, CFG.BATT_SERVICE, CFG.WHOOP_SERVICE]
+        optionalServices: [CFG.HR_SERVICE, CFG.BATT_SERVICE, CFG.WHOOP_SERVICE, CFG.WHOOP5_SERVICE]
       });
       console.log("[WHOOPI] Gerät:", state.device.name || "(ohne Namen)");
       state.device.addEventListener("gattserverdisconnected", onDisconnected);
@@ -685,17 +687,21 @@
       "✓ Herzfrequenz-Dienst (0x180D)",
       (state.battChar ? "✓" : "✗") + " Batterie-Dienst (0x180F)"
     ];
+    state.generation = null;
     try {
-      const svc = await state.server.getPrimaryService(CFG.WHOOP_SERVICE);
+      let svc, gen, cmdUuid;
+      try { svc = await state.server.getPrimaryService(CFG.WHOOP_SERVICE); gen = "gen4"; cmdUuid = CFG.WHOOP_CMD_CHAR; }
+      catch (_) { svc = await state.server.getPrimaryService(CFG.WHOOP5_SERVICE); gen = "gen5"; cmdUuid = CFG.WHOOP5_CMD_CHAR; }
+      state.generation = gen;
       const chars = await svc.getCharacteristics();
-      lines.push("✓ Proprietärer WHOOPI-Dienst erreichbar (" + chars.length + " Merkmale)");
-      console.log("[WHOOPI] Proprietäre Merkmale:", chars.map((c) => c.uuid));
-      try { state.cmdChar = await svc.getCharacteristic(CFG.WHOOP_CMD_CHAR); } catch (_) { state.cmdChar = null; }
+      lines.push("✓ " + (gen === "gen5" ? "Whoop 5.0" : "Whoop 4.0") + "-Dienst erreichbar (" + chars.length + " Merkmale)");
+      console.log("[WHOOPI] Generation:", gen, chars.map((c) => c.uuid));
+      try { state.cmdChar = await svc.getCharacteristic(cmdUuid); } catch (_) { state.cmdChar = null; }
       setAlarmAvailable(!!state.cmdChar);
-      lines.push((state.cmdChar ? "✓" : "✗") + " Alarm-Schreibkanal " + (state.cmdChar ? "bereit (im Profil testbar)" : "nicht gefunden"));
+      lines.push((state.cmdChar ? "✓" : "✗") + " Alarm-Schreibkanal " + (state.cmdChar ? "bereit (" + (gen === "gen5" ? "5.0" : "4.0") + "-Framing)" : "nicht gefunden"));
     } catch (e) {
-      lines.push("✗ Proprietärer WHOOPI-Dienst nicht erreichbar → Alarm nicht möglich");
-      state.cmdChar = null; setAlarmAvailable(false);
+      lines.push("✗ Proprietärer Dienst (4.0 & 5.0) nicht erreichbar → Alarm nicht möglich");
+      state.cmdChar = null; state.generation = null; setAlarmAvailable(false);
       console.warn("[WHOOPI] Proprietärer Dienst:", e && e.message);
     }
     lines.push("RR-Intervalle: prüfe 10 s …");
@@ -711,11 +717,23 @@
   /* ============================ Vibrationsalarm (proprietärer Schreibbefehl) ============================ */
   function crc8(bytes) { let c = 0; for (const x of bytes) { c ^= x; for (let i = 0; i < 8; i++) c = (c & 0x80) ? ((c << 1) ^ 0x07) & 0xFF : (c << 1) & 0xFF; } return c & 0xFF; }
   function crc32(bytes) { let c = 0xFFFFFFFF; for (const x of bytes) { c ^= x; for (let i = 0; i < 8; i++) c = (c & 1) ? (c >>> 1) ^ 0xEDB88320 : c >>> 1; } return (~c) >>> 0; }
+  function crc16(bytes) { let c = 0xFFFF; for (const x of bytes) { c ^= x; for (let i = 0; i < 8; i++) c = (c & 1) ? (c >>> 1) ^ 0xA001 : c >>> 1; } return c & 0xFFFF; }
   const byteAt = (n, i) => (n >>> (i * 8)) & 0xFF;
-  // Gen4-Befehlsframe: [AA][len:2 LE][crc8][0x23=Command][seq][cmd][data…][crc32:4 LE]
+  // Befehlsframe je Generation:
+  //  4.0: [AA][len:2 LE][crc8][0x23][seq][cmd][data][crc32:4 LE]
+  //  5.0: [AA][01][len:2 LE][00][01][crc16:2 LE][0x23][seq][cmd][data + 4er-Padding][crc32:4 LE]
   function whoopFrame(cmd, data) {
-    const pkt = [0x23, state.cmdSeq & 0xFF, cmd, ...data];
+    const seq = state.cmdSeq & 0xFF;
     state.cmdSeq = (state.cmdSeq + 1) & 0xFF;
+    if (state.generation === "gen5") {
+      const pkt = [0x23, seq, cmd, ...data];
+      while (pkt.length % 4 !== 0) pkt.push(0);
+      const len = pkt.length + 4;
+      const header = [0xAA, 0x01, len & 0xFF, (len >> 8) & 0xFF, 0x00, 0x01];
+      const c16 = crc16(header), c32 = crc32(pkt);
+      return new Uint8Array([...header, c16 & 0xFF, (c16 >> 8) & 0xFF, ...pkt, byteAt(c32, 0), byteAt(c32, 1), byteAt(c32, 2), byteAt(c32, 3)]);
+    }
+    const pkt = [0x23, seq, cmd, ...data];
     const len = pkt.length + 4;
     const lenbuf = [len & 0xFF, (len >> 8) & 0xFF];
     const c32 = crc32(pkt);
@@ -723,7 +741,9 @@
   }
   async function sendWhoop(cmd, data) {
     if (!state.cmdChar) throw new Error("proprietärer Dienst nicht verfügbar");
-    await state.cmdChar.writeValueWithoutResponse(whoopFrame(cmd, data));
+    const frame = whoopFrame(cmd, data);
+    try { await state.cmdChar.writeValueWithoutResponse(frame); }
+    catch (_) { await state.cmdChar.writeValue(frame); }   // Fallback: Schreiben mit Antwort
   }
   function setAlarmAvailable(ok) {
     if (!els.setAlarmBtn) return;
@@ -734,8 +754,11 @@
       : "Verbinde dein Gerät. Der Vibrationsalarm braucht den proprietären WHOOPI-Dienst.";
   }
   async function testVibrate() {
-    try { await sendWhoop(68, [0x00]); showBanner("📳 Vibrations-Befehl gesendet – spürst du es?", "info"); setTimeout(hideBanner, 4000); }
-    catch (e) { showBanner("❌ Vibration fehlgeschlagen: " + (e && e.message), "error"); console.error("[WHOOPI] RunAlarm:", e); }
+    try {
+      if (state.generation === "gen5") await sendWhoop(19, [0x01, 0x2f, 0x98, 0, 0, 0, 0, 0, 0, 0, 0, 0x01, 0x00]); // Haptik-Pattern (5.0)
+      else await sendWhoop(68, [0x00]); // RunAlarm (4.0)
+      showBanner("📳 Vibrations-Befehl gesendet – spürst du es?", "info"); setTimeout(hideBanner, 4000);
+    } catch (e) { showBanner("❌ Vibration fehlgeschlagen: " + (e && e.message), "error"); console.error("[WHOOPI] Vibrate:", e); }
   }
   async function setAlarmAt() {
     const v = (els.alarmTime.value || "").split(":");
@@ -743,9 +766,14 @@
     const d = new Date(); d.setHours(+v[0], +v[1], 0, 0);
     if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1); // nächster passender Tag
     const unix = Math.floor(d.getTime() / 1000), now = Math.floor(Date.now() / 1000);
+    const ub = [byteAt(unix, 0), byteAt(unix, 1), byteAt(unix, 2), byteAt(unix, 3)];
     try {
-      await sendWhoop(10, [byteAt(now, 0), byteAt(now, 1), byteAt(now, 2), byteAt(now, 3), 0, 0, 0, 0, 0]);   // Geräteuhr synchronisieren
-      await sendWhoop(66, [0x01, byteAt(unix, 0), byteAt(unix, 1), byteAt(unix, 2), byteAt(unix, 3), 0, 0, 0, 0]); // Wecker setzen
+      if (state.generation === "gen5") {
+        await sendWhoop(66, [0x04, 0x01, ...ub, 0x00, 0x00, 0x2f, 0x98, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 0x1e, 0x00]); // Wecker (5.0)
+      } else {
+        await sendWhoop(10, [byteAt(now, 0), byteAt(now, 1), byteAt(now, 2), byteAt(now, 3), 0, 0, 0, 0, 0]);   // Geräteuhr sync (4.0)
+        await sendWhoop(66, [0x01, ...ub, 0, 0, 0, 0]); // Wecker (4.0)
+      }
       state.alarmSet = d.getTime(); try { localStorage.setItem("whoopi-alarm", String(state.alarmSet)); } catch (_) {}
       updateAlarmDisplay();
       showBanner("⏰ Wecker gestellt: " + d.toLocaleString("de-DE", { weekday: "short", hour: "2-digit", minute: "2-digit" }), "info");
@@ -769,7 +797,7 @@
     finishSession(false); cleanupConnection();
     els.connectBtn.textContent = "WHOOPI verbinden"; els.finishBtn.disabled = true; els.hero.classList.add("idle");
   }
-  function cleanupConnection() { if (state.battTimer) { clearInterval(state.battTimer); state.battTimer = null; } state.hrChar = null; state.battChar = null; state.cmdChar = null; state.server = null; setAlarmAvailable(false); }
+  function cleanupConnection() { if (state.battTimer) { clearInterval(state.battTimer); state.battTimer = null; } state.hrChar = null; state.battChar = null; state.cmdChar = null; state.server = null; state.generation = null; setAlarmAvailable(false); }
   async function disconnect() {
     finishSession(false);
     try { if (state.device && state.device.gatt && state.device.gatt.connected) state.device.gatt.disconnect(); } catch (err) { console.warn(err); }
