@@ -1093,7 +1093,7 @@
   els.connectBtn.addEventListener("click", () => { if (state.server) disconnect(); else connect(); });
   els.demoBtn.addEventListener("click", () => { if (state.demo) stopDemo(); else startDemo(); });
   els.actChips.querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => startActivity(c.getAttribute("data-act"))));
-  els.actFinishBtn.addEventListener("click", () => finishActivity(true));
+  els.actFinishBtn.addEventListener("click", () => finishActivity(false)); // nur speichern; CSV-Export im Verlauf
   if (els.connectHint) els.connectHint.addEventListener("click", () => switchTab("profile"));
   els.saveProfile.addEventListener("click", saveProfile);
   els.exportBtn.addEventListener("click", exportBackup);
