@@ -120,6 +120,12 @@
     .zone-bar > div { height: 100%; border-radius: 99px; transition: width .6s cubic-bezier(.4,0,.2,1); }
 
     /* Buttons */
+    /* Aktivitäts-Chips + Verbinden-Link */
+    .act-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip { background: var(--surface-high); border: 1px solid var(--border); color: var(--text); border-radius: 999px; padding: 9px 13px; font-size: 13px; font-weight: 600; cursor: pointer; transition: transform .08s, opacity .2s; }
+    .chip:active { transform: scale(0.95); }
+    .chip:disabled { opacity: 0.4; cursor: not-allowed; }
+    .conn-link { color: var(--lime); font-weight: 700; cursor: pointer; font-size: 13px; }
     .btns { display: flex; gap: 10px; margin-top: 16px; }
     button {
       font-family: inherit; font-size: 15px; font-weight: 700; border: none;
@@ -206,9 +212,10 @@
         <div class="scan"></div>
         <div>
           <div class="caps">Geräte-Verbindung</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;">
             <span id="connDot2" class="dot"></span>
             <span id="connHeadline" style="font-size:17px;font-weight:700;">Kein Gerät</span>
+            <span id="connectHint" class="conn-link">· im Profil verbinden →</span>
           </div>
         </div>
         <div class="batt">
@@ -231,7 +238,7 @@
             <svg class="ico-sm neon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
           </div>
           <div><span id="rrVal" class="val sm data neon">–</span></div>
-          <div id="rrSub" class="sub">letztes RR-Intervall</div>
+          <div id="rrSub" class="sub">HRV (RMSSD)</div>
         </div>
         <div class="card metric">
           <div class="top"><span class="caps">Signal</span>
@@ -241,11 +248,11 @@
           <div id="signalSub" class="sub">Hautkontakt</div>
         </div>
         <div class="card metric">
-          <div class="top"><span class="caps">Workout</span>
-            <svg class="ico-sm lime" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>
+          <div class="top"><span class="caps">Ruhepuls</span>
+            <svg class="ico-sm" style="color:var(--blue-soft)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 5 4-10 2 5h6"/></svg>
           </div>
-          <div><span id="timerVal" class="val sm data">00:00</span></div>
-          <div id="kcalSub" class="sub">– kcal</div>
+          <div><span id="restVal" class="val sm data">–</span></div>
+          <div id="restSub" class="sub">unteres HR-Quartil</div>
         </div>
         <div class="card metric">
           <div class="top"><span class="caps">Stress</span>
@@ -273,12 +280,42 @@
         <div id="zoneHint" class="sub" style="margin-top:10px;">Trage im Profil deine max. Herzfrequenz ein, um Zonen zu sehen.</div>
       </div>
 
-      <!-- Aktionen -->
-      <div class="btns">
-        <button id="connectBtn" class="b-primary">WHOOPI verbinden</button>
-        <button id="demoBtn" class="b-ghost" style="flex:.5;">Demo</button>
+      <!-- Aktivität -->
+      <div class="card">
+        <div id="actIdle">
+          <div class="chart-head" style="margin-bottom:10px;"><span class="caps">Aktivität starten</span></div>
+          <div class="act-chips" id="actChips">
+            <button class="chip" data-act="run">🏃 Laufen</button>
+            <button class="chip" data-act="walk">🚶 Gehen</button>
+            <button class="chip" data-act="ride">🚴 Radfahren</button>
+            <button class="chip" data-act="hike">🥾 Wandern</button>
+            <button class="chip" data-act="strength">🏋️ Kraft</button>
+            <button class="chip" data-act="hiit">⚡ HIIT</button>
+            <button class="chip" data-act="yoga">🧘 Yoga</button>
+            <button class="chip" data-act="row">🚣 Rudern</button>
+            <button class="chip" data-act="swim">🏊 Schwimmen</button>
+            <button class="chip" data-act="other">➕ Sonstige</button>
+          </div>
+          <div id="actHint" class="sub" style="margin-top:10px;">Tippe einen Typ, um die Aufzeichnung zu starten.</div>
+        </div>
+        <div id="actLive" class="hidden">
+          <div class="chart-head"><span id="actKindLabel" class="caps" style="font-size:14px;color:var(--text)">Aktivität</span><span id="actTimer" class="data lime" style="font-size:22px;">00:00</span></div>
+          <div style="display:flex;justify-content:space-between;margin-top:6px;color:var(--text-dim);font-size:13px;">
+            <span id="actKcal">– kcal</span><span id="actAvg">Ø – bpm</span>
+          </div>
+          <button id="actFinishBtn" class="b-danger b-wide" style="margin-top:14px;">Beenden &amp; speichern</button>
+        </div>
       </div>
-      <button id="finishBtn" class="b-danger b-wide" style="margin-top:10px;" disabled>Session beenden &amp; speichern</button>
+
+      <!-- Vibrationsalarm & Wecker -->
+      <div class="sec-title"><span class="caps" style="font-size:13px;">Vibrationsalarm &amp; Wecker</span></div>
+      <div class="card">
+        <div id="alarmStatus" class="info-box" style="margin-bottom:14px;">Verbinde dein Gerät. Der Vibrationsalarm braucht den proprietären WHOOPI-Dienst.</div>
+        <div class="field"><label for="alarmTime">Weckzeit</label><input id="alarmTime" type="time" value="07:00" /></div>
+        <button id="setAlarmBtn" class="b-primary b-wide" disabled>Wecker stellen</button>
+        <button id="alarmOffBtn" class="b-ghost b-wide hidden" style="margin-top:10px;">Wecker ausschalten</button>
+        <button id="testVibrateBtn" class="b-ghost b-wide" style="margin-top:10px;" disabled>Jetzt vibrieren (Test)</button>
+      </div>
     </section>
 
     <!-- ========================= VERLAUF ========================= -->
@@ -289,6 +326,14 @@
 
     <!-- ========================= PROFIL ========================= -->
     <section id="tab-profile" class="tab-panel hidden">
+      <div class="sec-title"><span class="caps" style="font-size:13px;">Verbindung</span></div>
+      <div class="card">
+        <div class="btns" style="margin-top:0;">
+          <button id="connectBtn" class="b-primary">WHOOPI verbinden</button>
+          <button id="demoBtn" class="b-ghost" style="flex:.5;">Demo</button>
+        </div>
+      </div>
+
       <div class="sec-title"><span class="caps" style="font-size:13px;">Dein Profil</span></div>
       <div class="card">
         <div class="row2">
@@ -321,15 +366,6 @@
       <div class="sec-title"><span class="caps" style="font-size:13px;">Bluetooth-Diagnose</span></div>
       <div class="card">
         <div id="diagOutput" class="info-box">Verbinde dein WHOOPI – hier zeige ich (nur lesend), welche Dienste &amp; Daten dein Band wirklich liefert. Das entscheidet, ob Stress-Index &amp; Vibrationsalarm machbar sind.</div>
-      </div>
-
-      <div class="sec-title"><span class="caps" style="font-size:13px;">Vibrationsalarm</span></div>
-      <div class="card">
-        <div id="alarmStatus" class="info-box" style="margin-bottom:14px;">Verbinde dein Gerät. Der Vibrationsalarm braucht den proprietären WHOOPI-Dienst.</div>
-        <div class="field"><label for="alarmTime">Weckzeit</label><input id="alarmTime" type="time" value="07:00" /></div>
-        <button id="setAlarmBtn" class="b-primary b-wide" disabled>Wecker stellen</button>
-        <button id="alarmOffBtn" class="b-ghost b-wide hidden" style="margin-top:10px;">Wecker ausschalten</button>
-        <button id="testVibrateBtn" class="b-ghost b-wide" style="margin-top:10px;" disabled>Jetzt vibrieren (Test)</button>
       </div>
 
       <div class="card" style="margin-top:14px;">
@@ -392,10 +428,12 @@
     battVal: $("battVal"),
     hero: $("hero"), bpmValue: $("bpmValue"),
     rrVal: $("rrVal"), rrSub: $("rrSub"), signalVal: $("signalVal"), signalSub: $("signalSub"),
-    timerVal: $("timerVal"), kcalSub: $("kcalSub"),
+    restVal: $("restVal"), restSub: $("restSub"),
     hrNow: $("hrNow"), rrNow: $("rrNow"),
     zones: $("zones"), zoneTotal: $("zoneTotal"), zoneHint: $("zoneHint"),
-    connectBtn: $("connectBtn"), demoBtn: $("demoBtn"), finishBtn: $("finishBtn"),
+    connectBtn: $("connectBtn"), demoBtn: $("demoBtn"), connectHint: $("connectHint"),
+    actIdle: $("actIdle"), actLive: $("actLive"), actChips: $("actChips"), actHint: $("actHint"),
+    actKindLabel: $("actKindLabel"), actTimer: $("actTimer"), actKcal: $("actKcal"), actAvg: $("actAvg"), actFinishBtn: $("actFinishBtn"),
     history: $("history"), histCount: $("histCount"),
     pfAge: $("pfAge"), pfWeight: $("pfWeight"), pfSex: $("pfSex"), pfMaxHr: $("pfMaxHr"),
     saveProfile: $("saveProfile"), profileHint: $("profileHint"),
@@ -409,7 +447,7 @@
     device: null, server: null, hrChar: null, battChar: null, cmdChar: null, cmdSeq: 0, generation: null,
     battTimer: null, autosaveTimer: null, beatTimer: null,
     demo: false, demoTimer: null,
-    sessionActive: false, session: null, rrSeen: false, rrBuffer: [], alarmSet: null,
+    sessionActive: false, session: null, rrSeen: false, rrBuffer: [], bpmBuffer: [], alarmSet: null,
     profile: { age: null, weight: null, sex: "m", maxHr: null }
   };
 
@@ -430,6 +468,7 @@
     els.connDot2.className = "dot " + cls;
     els.connText.textContent = chip;
     els.connHeadline.textContent = head;
+    if (els.connectHint) els.connectHint.classList.toggle("hidden", s === "connected" || s === "demo");
   }
 
   /* ============================ Rolling-Chart ============================ */
@@ -572,8 +611,7 @@
 
   function renderZones() {
     const m = maxHr();
-    if (!m) { els.zones.innerHTML = ""; els.zoneHint.classList.remove("hidden"); return; }
-    els.zoneHint.classList.add("hidden");
+    if (!m) { els.zones.innerHTML = ""; els.zoneHint.textContent = "Trage im Profil deine max. Herzfrequenz ein, um Zonen zu sehen."; els.zoneHint.classList.remove("hidden"); return; }
     const times = (state.session && state.session.zoneSec) || [0, 0, 0, 0, 0];
     els.zoneTotal.textContent = fmtClock(times.reduce((a, b) => a + b, 0));
     const total = times.reduce((a, b) => a + b, 0) || 1;
@@ -584,6 +622,73 @@
       return '<div class="zone-row"><div class="zl"><span>' + z.name + ' · ' + lo + (i === 0 ? '+' : '–' + hi) + '</span><span>' + fmtClock(times[i]) + '</span></div>' +
              '<div class="zone-bar"><div style="width:' + pct + '%;background:' + z.color + '"></div></div></div>';
     }).join("");
+    els.zoneHint.textContent = "Zonen werden während einer Aktivität aufgezeichnet.";
+    els.zoneHint.classList.toggle("hidden", state.sessionActive);
+  }
+
+  /* ============================ Aktivitäten + Live-Metriken ============================ */
+  const ACT = [
+    { k: "run", label: "Laufen", emoji: "🏃" }, { k: "walk", label: "Gehen", emoji: "🚶" },
+    { k: "ride", label: "Radfahren", emoji: "🚴" }, { k: "hike", label: "Wandern", emoji: "🥾" },
+    { k: "strength", label: "Kraft", emoji: "🏋️" }, { k: "hiit", label: "HIIT", emoji: "⚡" },
+    { k: "yoga", label: "Yoga", emoji: "🧘" }, { k: "row", label: "Rudern", emoji: "🚣" },
+    { k: "swim", label: "Schwimmen", emoji: "🏊" }, { k: "other", label: "Sonstige", emoji: "➕" }
+  ];
+  // RMSSD = echtes Kurzzeit-HRV aus aufeinanderfolgenden RR-Intervallen (ms)
+  function rmssd(rr) {
+    if (rr.length < 3) return null;
+    let sum = 0, n = 0;
+    for (let i = 1; i < rr.length; i++) { const d = rr[i] - rr[i - 1]; sum += d * d; n++; }
+    return n ? Math.round(Math.sqrt(sum / n)) : null;
+  }
+  // Ruhepuls-Schätzung: Mittel des unteren Viertels der jüngsten BPM-Werte
+  function restingHr(bpms) {
+    if (bpms.length < 30) return null;
+    const sorted = bpms.slice().sort((a, b) => a - b);
+    const q = Math.max(1, Math.floor(sorted.length / 4));
+    let sum = 0; for (let i = 0; i < q; i++) sum += sorted[i];
+    return Math.round(sum / q);
+  }
+  function updateLiveMetrics() {
+    const r = rmssd(state.rrBuffer.slice(-50));
+    if (r != null) { els.rrVal.textContent = r + " ms"; els.rrSub.textContent = "HRV (RMSSD)"; }
+    const rest = restingHr(state.bpmBuffer);
+    if (rest != null) { els.restVal.textContent = rest; els.restSub.textContent = "Ruhepuls (geschätzt)"; }
+    updateStress();
+  }
+  function updateActivityControls() {
+    if (!els.actChips) return;
+    const canRecord = !!(state.server || state.demo);
+    els.actIdle.classList.toggle("hidden", state.sessionActive);
+    els.actLive.classList.toggle("hidden", !state.sessionActive);
+    els.actChips.querySelectorAll(".chip").forEach((c) => { c.disabled = !canRecord; });
+    els.actHint.textContent = canRecord ? "Tippe einen Typ, um die Aufzeichnung zu starten." : "Verbinde zuerst dein Gerät (Tab Profil).";
+  }
+  function startActivity(kind) {
+    if (!(state.server || state.demo)) { showBanner("Verbinde zuerst dein Gerät (Tab Profil).", "warn"); setTimeout(hideBanner, 2500); return; }
+    if (state.sessionActive) return;
+    const a = ACT.find((x) => x.k === kind) || ACT[ACT.length - 1];
+    state.session = { id: "s_" + Date.now(), kind: a.k, kindLabel: a.label, start: Date.now(), samples: [], zoneSec: [0, 0, 0, 0, 0], kcal: 0, _lastT: 0, demo: state.demo };
+    state.sessionActive = true;
+    els.actKindLabel.textContent = a.emoji + " " + a.label;
+    startTimer(); renderZones(); updateActivityControls();
+    if (state.autosaveTimer) clearInterval(state.autosaveTimer);
+    state.autosaveTimer = setInterval(() => persistSession(state.session, true), CFG.AUTOSAVE_MS);
+    showBanner("▶️ " + a.label + " gestartet.", "info"); setTimeout(hideBanner, 2500);
+  }
+  async function finishActivity(doExport) {
+    if (!state.sessionActive || !state.session) return;
+    state.sessionActive = false;
+    clearInterval(timerInt);
+    if (state.autosaveTimer) { clearInterval(state.autosaveTimer); state.autosaveTimer = null; }
+    const sess = state.session; sess.end = Date.now();
+    const hadData = sess.samples.length > 0;
+    const summary = hadData ? await persistSession(sess, false) : null;
+    state.session = null;
+    updateActivityControls(); renderZones();
+    await renderHistory();
+    if (hadData && doExport) exportCSV(summary || sess);
+    if (!hadData) { showBanner("Aktivität ohne Daten – nicht gespeichert.", "warn"); setTimeout(hideBanner, 2500); }
   }
 
   /* ============================ Datenfluss ============================ */
@@ -592,28 +697,25 @@
     if (bpm > 0) {
       els.bpmValue.textContent = bpm; els.hrNow.textContent = bpm;
       triggerBeat(bpm); hrChart.push(bpm);
+      state.bpmBuffer.push(bpm); if (state.bpmBuffer.length > 400) state.bpmBuffer = state.bpmBuffer.slice(-400);
     }
     if (rr.length) {
       state.rrSeen = true;
       for (const x of rr) state.rrBuffer.push(x);
       if (state.rrBuffer.length > 600) state.rrBuffer = state.rrBuffer.slice(-600);
-      const lastRR = rr[rr.length - 1];
-      els.rrVal.textContent = lastRR + " ms"; els.rrNow.textContent = lastRR; els.rrSub.textContent = "letztes RR-Intervall";
+      els.rrNow.textContent = rr[rr.length - 1];
       rrChart.pushMany(rr);
-    } else if (els.rrVal.textContent === "–" || els.rrVal.textContent === "––") {
-      els.rrVal.textContent = "n/a"; els.rrSub.textContent = "Gerät sendet kein RR";
     }
     if (contactSupported) { els.signalVal.textContent = contactDetected ? "OK" : "—"; els.signalSub.textContent = contactDetected ? "Hautkontakt" : "kein Kontakt"; }
     else { els.signalVal.textContent = "n/a"; els.signalSub.textContent = "nicht unterstützt"; }
+    updateLiveMetrics();
 
     if (state.sessionActive && state.session && bpm > 0) {
       const s = state.session;
       s.samples.push({ t, bpm, rr: rr.length ? rr[rr.length - 1] : null });
-      // Zonen-Zeit & Kalorien akkumulieren (Annahme ~1 Sample/Sekunde)
-      const dt = s._lastT ? Math.min(5, (t - s._lastT) / 1000) : 1; s._lastT = t;
+      const dt = s._lastT ? Math.min(5, (t - s._lastT) / 1000) : 1; s._lastT = t;   // ~1 Sample/Sekunde
       const zi = zoneIndex(bpm); if (zi >= 0) s.zoneSec[zi] += dt;
       s.kcal += kcalPerMin(bpm) * (dt / 60);
-      els.kcalSub.textContent = s.kcal >= 1 ? Math.round(s.kcal) + " kcal" : "– kcal";
       if (maxHr()) renderZones();
     }
   }
@@ -644,12 +746,12 @@
       state.device.addEventListener("gattserverdisconnected", onDisconnected);
       state.server = await state.device.gatt.connect();
       setConnState("connected");
-      state.rrSeen = false; state.cmdSeq = 0;
+      state.rrSeen = false; state.cmdSeq = 0; state.rrBuffer = []; state.bpmBuffer = [];
       await subscribeHeartRate(); await setupBattery();
       runDiagnostics();
-      startSession();
-      els.connectBtn.textContent = "Trennen"; els.finishBtn.disabled = false;
-      showBanner("✅ Verbunden mit " + (state.device.name || "Gerät") + ". Aufzeichnung läuft.", "info");
+      els.connectBtn.textContent = "Trennen";
+      updateActivityControls();
+      showBanner("✅ Verbunden mit " + (state.device.name || "Gerät") + ". Live-Daten laufen – starte eine Aktivität zum Aufzeichnen.", "info");
       setTimeout(hideBanner, 4000);
     } catch (err) {
       if (err && err.name === "NotFoundError") { setConnState("disconnected"); console.log("[WHOOPI] Auswahl abgebrochen."); return; }
@@ -793,51 +895,36 @@
   function onDisconnected() {
     console.warn("[WHOOPI] Verbindung verloren.");
     setConnState("error");
-    showBanner("⚠️ Verbindung verloren. Session wurde gespeichert.", "warn");
-    finishSession(false); cleanupConnection();
-    els.connectBtn.textContent = "WHOOPI verbinden"; els.finishBtn.disabled = true; els.hero.classList.add("idle");
+    showBanner("⚠️ Verbindung verloren." + (state.sessionActive ? " Aktivität wurde gespeichert." : ""), "warn");
+    finishActivity(false); cleanupConnection();
+    els.connectBtn.textContent = "WHOOPI verbinden"; els.hero.classList.add("idle");
+    updateActivityControls();
   }
   function cleanupConnection() { if (state.battTimer) { clearInterval(state.battTimer); state.battTimer = null; } state.hrChar = null; state.battChar = null; state.cmdChar = null; state.server = null; state.generation = null; setAlarmAvailable(false); }
   async function disconnect() {
-    finishSession(false);
+    await finishActivity(false);
     try { if (state.device && state.device.gatt && state.device.gatt.connected) state.device.gatt.disconnect(); } catch (err) { console.warn(err); }
     cleanupConnection(); setConnState("disconnected");
-    els.connectBtn.textContent = "WHOOPI verbinden"; els.finishBtn.disabled = true; els.hero.classList.add("idle");
+    els.connectBtn.textContent = "WHOOPI verbinden"; els.hero.classList.add("idle");
+    updateActivityControls();
   }
 
   /* ============================ Session + Timer ============================ */
   let timerInt = null;
-  function startSession() {
-    state.session = { id: "s_" + Date.now(), start: Date.now(), samples: [], zoneSec: [0, 0, 0, 0, 0], kcal: 0, _lastT: 0, demo: state.demo };
-    state.rrBuffer = [];
-    state.sessionActive = true;
-    startTimer();
-    renderZones();
-    if (state.autosaveTimer) clearInterval(state.autosaveTimer);
-    state.autosaveTimer = setInterval(() => persistSession(state.session, true), CFG.AUTOSAVE_MS);
-  }
   function fmtClock(sec) { sec = Math.floor(sec); const m = Math.floor(sec / 60), s = sec % 60; return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0"); }
   function startTimer() {
     const pad = (n) => String(n).padStart(2, "0");
     const tick = () => {
       if (!state.sessionActive || !state.session) return;
-      const sec = Math.floor((Date.now() - state.session.start) / 1000);
-      const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
-      els.timerVal.textContent = h > 0 ? (h + ":" + pad(m) + ":" + pad(s)) : (pad(m) + ":" + pad(s));
-      if (sec % 3 === 0) updateStress();   // Stress-Index alle 3 s aktualisieren
+      const s = state.session;
+      const sec = Math.floor((Date.now() - s.start) / 1000);
+      const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), ss = sec % 60;
+      els.actTimer.textContent = h > 0 ? (h + ":" + pad(m) + ":" + pad(ss)) : (pad(m) + ":" + pad(ss));
+      els.actKcal.textContent = s.kcal >= 1 ? Math.round(s.kcal) + " kcal" : "– kcal";
+      const bpms = s.samples.map((x) => x.bpm).filter((b) => b > 0);
+      els.actAvg.textContent = bpms.length ? ("Ø " + Math.round(bpms.reduce((a, b) => a + b, 0) / bpms.length) + " bpm") : "Ø – bpm";
     };
     clearInterval(timerInt); tick(); timerInt = setInterval(tick, 1000);
-  }
-  async function finishSession(doExport) {
-    if (!state.sessionActive || !state.session) return;
-    state.sessionActive = false;
-    clearInterval(timerInt);
-    if (state.autosaveTimer) { clearInterval(state.autosaveTimer); state.autosaveTimer = null; }
-    const sess = state.session; sess.end = Date.now();
-    if (sess.samples.length === 0) { state.session = null; await renderHistory(); return; }
-    const summary = await persistSession(sess, false);
-    state.session = null; await renderHistory();
-    if (doExport) exportCSV(summary || sess);
   }
 
   /* ============================ IndexedDB ============================ */
@@ -861,6 +948,7 @@
     const rrs = sess.samples.map((s) => s.rr).filter((r) => r != null);
     const rec = {
       id: sess.id, start: sess.start, end: sess.end || Date.now(), demo: !!sess.demo,
+      kind: sess.kind || null, kindLabel: sess.kindLabel || null,
       count: sess.samples.length,
       avg: bpms.length ? Math.round(bpms.reduce((a, b) => a + b, 0) / bpms.length) : 0,
       min: bpms.length ? Math.min(...bpms) : 0, max: bpms.length ? Math.max(...bpms) : 0,
@@ -879,16 +967,17 @@
     let sessions; try { sessions = await dbAll(); } catch (err) { console.error("[WHOOPI] Verlauf:", err); return; }
     sessions.sort((a, b) => b.start - a.start);
     els.histCount.textContent = sessions.length ? sessions.length + " gesamt" : "";
-    if (!sessions.length) { els.history.innerHTML = '<div class="empty">Noch keine Aufzeichnungen.<br>Verbinde dein WHOOPI oder starte den Demo-Modus.</div>'; return; }
+    if (!sessions.length) { els.history.innerHTML = '<div class="empty">Noch keine Aufzeichnungen.<br>Verbinde dein Gerät (Tab Profil) und starte eine Aktivität.</div>'; return; }
     els.history.innerHTML = "";
     for (const s of sessions) {
       const dur = (s.end || s.start) - s.start;
+      const a = ACT.find((x) => x.k === s.kind);
       const item = document.createElement("div");
       item.className = "card hist-item";
       item.innerHTML =
-        '<div class="hist-ico"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg></div>' +
-        '<div class="hist-main"><h4>' + fmtDate(s.start) + (s.demo ? ' · <span style="color:#ffce5c">Demo</span>' : '') + '</h4>' +
-          '<p>' + fmtDuration(dur) + ' · ' + s.count + ' Punkte' + (s.kcal ? ' · ' + s.kcal + ' kcal' : '') + (s.rrCount ? ' · ' + s.rrCount + ' RR' : '') + '</p></div>' +
+        '<div class="hist-ico"' + (a ? ' style="font-size:22px;background:var(--surface-high)"' : '') + '>' + (a ? a.emoji : '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg>') + '</div>' +
+        '<div class="hist-main"><h4>' + (a ? a.label : "Aufzeichnung") + (s.demo ? ' · <span style="color:#ffce5c">Demo</span>' : '') + '</h4>' +
+          '<p>' + fmtDate(s.start) + ' · ' + fmtDuration(dur) + (s.kcal ? ' · ' + s.kcal + ' kcal' : '') + (s.rrCount ? ' · ' + s.rrCount + ' RR' : '') + '</p></div>' +
         '<div class="hist-stat"><div class="b data lime">' + s.avg + '</div><div class="s">Ø · max ' + s.max + '</div></div>' +
         '<div class="hist-actions">' +
           '<button class="icon-btn" data-dl="' + s.id + '" title="CSV"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg></button>' +
@@ -956,9 +1045,10 @@
   function startDemo() {
     if (state.server) { showBanner("Erst Gerät trennen, dann Demo.", "warn"); setTimeout(hideBanner, 2500); return; }
     state.demo = true; setConnState("demo"); els.battVal.textContent = "87%";
-    els.demoBtn.textContent = "Demo stop"; els.connectBtn.disabled = true; els.finishBtn.disabled = false;
-    showBanner("▶️ Demo-Modus: simulierte Herzfrequenz & RR.", "info"); setTimeout(hideBanner, 3500);
-    startSession();
+    state.rrBuffer = []; state.bpmBuffer = [];
+    els.demoBtn.textContent = "Demo stop"; els.connectBtn.disabled = true;
+    updateActivityControls();
+    showBanner("▶️ Demo-Modus: simulierte Live-Daten. Starte eine Aktivität zum Aufzeichnen.", "info"); setTimeout(hideBanner, 3500);
     let bpm = 85, tick = 0;
     state.demoTimer = setInterval(() => {
       tick++;
@@ -972,9 +1062,11 @@
   }
   function stopDemo(doExport) {
     if (state.demoTimer) { clearInterval(state.demoTimer); state.demoTimer = null; }
-    state.demo = false; finishSession(!!doExport);
-    els.demoBtn.textContent = "Demo"; els.connectBtn.disabled = false; els.finishBtn.disabled = true;
+    state.demo = false;
+    if (state.sessionActive) finishActivity(!!doExport);
+    els.demoBtn.textContent = "Demo"; els.connectBtn.disabled = false;
     setConnState("disconnected"); els.hero.classList.add("idle"); els.bpmValue.textContent = "––";
+    updateActivityControls();
   }
 
   /* ============================ Tabs ============================ */
@@ -1000,10 +1092,9 @@
   /* ============================ Verdrahtung + Init ============================ */
   els.connectBtn.addEventListener("click", () => { if (state.server) disconnect(); else connect(); });
   els.demoBtn.addEventListener("click", () => { if (state.demo) stopDemo(); else startDemo(); });
-  els.finishBtn.addEventListener("click", async () => {
-    if (state.demo) { stopDemo(true); }
-    else { await finishSession(true); if (state.server) startSession(); else els.finishBtn.disabled = true; }
-  });
+  els.actChips.querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => startActivity(c.getAttribute("data-act"))));
+  els.actFinishBtn.addEventListener("click", () => finishActivity(true));
+  if (els.connectHint) els.connectHint.addEventListener("click", () => switchTab("profile"));
   els.saveProfile.addEventListener("click", saveProfile);
   els.exportBtn.addEventListener("click", exportBackup);
   els.importBtn.addEventListener("click", () => els.importFile.click());
@@ -1022,6 +1113,7 @@
     loadProfile();
     try { const a = localStorage.getItem("whoopi-alarm"); if (a) state.alarmSet = +a; } catch (_) {}
     updateAlarmDisplay();
+    updateActivityControls();
     renderHistory();
     requestPersistence();
   }
