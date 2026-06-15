@@ -360,6 +360,7 @@
         <div id="syncOn" class="hidden">
           <div id="syncStatus" class="info-box" style="margin-bottom:14px;">✓ Cloud-Sync aktiv.</div>
           <button id="syncNowBtn" class="b-primary b-wide">Jetzt synchronisieren</button>
+          <button id="syncDownloadBtn" class="b-ghost b-wide" style="margin-top:10px;">Aus Cloud laden &amp; als Datei sichern (iCloud)</button>
           <button id="syncOffBtn" class="b-ghost b-wide" style="margin-top:10px;">Cloud-Sync deaktivieren</button>
         </div>
       </div>
@@ -457,7 +458,7 @@
     storageHint: $("storageHint"), clearAll: $("clearAll"), diagOutput: $("diagOutput"),
     alarmStatus: $("alarmStatus"), alarmTime: $("alarmTime"), setAlarmBtn: $("setAlarmBtn"), testVibrateBtn: $("testVibrateBtn"), alarmOffBtn: $("alarmOffBtn"),
     stressVal: $("stressVal"), stressSub: $("stressSub"),
-    syncPass: $("syncPass"), syncEnableBtn: $("syncEnableBtn"), syncOff: $("syncOff"), syncOn: $("syncOn"), syncStatus: $("syncStatus"), syncNowBtn: $("syncNowBtn"), syncOffBtn: $("syncOffBtn")
+    syncPass: $("syncPass"), syncEnableBtn: $("syncEnableBtn"), syncOff: $("syncOff"), syncOn: $("syncOn"), syncStatus: $("syncStatus"), syncNowBtn: $("syncNowBtn"), syncDownloadBtn: $("syncDownloadBtn"), syncOffBtn: $("syncOffBtn")
   };
 
   const state = {
@@ -1207,6 +1208,11 @@
   els.exportBtn.addEventListener("click", exportBackup);
   els.syncEnableBtn.addEventListener("click", () => enableSync(els.syncPass.value));
   els.syncNowBtn.addEventListener("click", () => syncNow(true));
+  els.syncDownloadBtn.addEventListener("click", async () => {
+    showBanner("Lade aus der Cloud …", "info");
+    try { await syncDown(); await renderHistory(); await exportBackup(); }
+    catch (e) { showBanner("❌ " + (e && e.message), "error"); setTimeout(hideBanner, 4000); }
+  });
   els.syncOffBtn.addEventListener("click", disableSync);
   els.importBtn.addEventListener("click", () => els.importFile.click());
   els.importFile.addEventListener("change", (e) => { const f = e.target.files && e.target.files[0]; if (f) importBackup(f); e.target.value = ""; });
