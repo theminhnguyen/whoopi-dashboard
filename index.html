@@ -378,6 +378,13 @@
         <div id="storageHint" class="sub" style="margin-top:12px;"></div>
       </div>
 
+      <div class="sec-title"><span class="caps" style="font-size:13px;">WHOOP-Export importieren</span></div>
+      <div class="card">
+        <div class="info-box" style="margin-bottom:14px;">Trainings aus der offiziellen WHOOP-App exportiert? Importiere die Datei <b>Trainings.csv</b> – deine vergangenen Workouts (Typ, Dauer, kcal, Ø/Max-HF, Zonen) landen im Verlauf.</div>
+        <button id="whoopImportBtn" class="b-ghost b-wide">Trainings.csv importieren</button>
+        <input id="whoopImportFile" type="file" accept=".csv,text/csv" class="hidden" />
+      </div>
+
       <div class="sec-title"><span class="caps" style="font-size:13px;">Bluetooth-Diagnose</span></div>
       <div class="card">
         <div id="diagOutput" class="info-box">Verbinde dein WHOOPI – hier zeige ich (nur lesend), welche Dienste &amp; Daten dein Band wirklich liefert. Das entscheidet, ob Stress-Index &amp; Vibrationsalarm machbar sind.</div>
@@ -454,7 +461,7 @@
     history: $("history"), histCount: $("histCount"),
     pfAge: $("pfAge"), pfWeight: $("pfWeight"), pfSex: $("pfSex"), pfMaxHr: $("pfMaxHr"),
     saveProfile: $("saveProfile"), profileHint: $("profileHint"),
-    exportBtn: $("exportBtn"), importBtn: $("importBtn"), importFile: $("importFile"),
+    exportBtn: $("exportBtn"), importBtn: $("importBtn"), importFile: $("importFile"), whoopImportBtn: $("whoopImportBtn"), whoopImportFile: $("whoopImportFile"),
     storageHint: $("storageHint"), clearAll: $("clearAll"), diagOutput: $("diagOutput"),
     alarmStatus: $("alarmStatus"), alarmTime: $("alarmTime"), setAlarmBtn: $("setAlarmBtn"), testVibrateBtn: $("testVibrateBtn"), alarmOffBtn: $("alarmOffBtn"),
     stressVal: $("stressVal"), stressSub: $("stressSub"),
@@ -996,7 +1003,7 @@
       item.className = "card hist-item";
       item.innerHTML =
         '<div class="hist-ico"' + (a ? ' style="font-size:22px;background:var(--surface-high)"' : '') + '>' + (a ? a.emoji : '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg>') + '</div>' +
-        '<div class="hist-main"><h4>' + (a ? a.label : "Aufzeichnung") + (s.demo ? ' · <span style="color:#ffce5c">Demo</span>' : '') + '</h4>' +
+        '<div class="hist-main"><h4>' + (s.kindLabel || (a ? a.label : "Aufzeichnung")) + (s.demo ? ' · <span style="color:#ffce5c">Demo</span>' : '') + '</h4>' +
           '<p>' + fmtDate(s.start) + ' · ' + fmtDuration(dur) + (s.kcal ? ' · ' + s.kcal + ' kcal' : '') + (s.rrCount ? ' · ' + s.rrCount + ' RR' : '') + '</p></div>' +
         '<div class="hist-stat"><div class="b data lime">' + s.avg + '</div><div class="s">Ø · max ' + s.max + '</div></div>' +
         '<div class="hist-actions">' +
@@ -1150,6 +1157,59 @@
     } catch (err) { console.error("[WHOOPI] Import:", err); showBanner("❌ Import fehlgeschlagen: ungültige Datei.", "error"); setTimeout(hideBanner, 4000); }
   }
 
+  /* ============================ WHOOP-CSV-Import (offizieller Export) ============================ */
+  const WHOOP_MAP = { "laufen": "run", "gehen": "walk", "spaziergang": "walk", "radfahren": "ride", "fahrradfahren": "ride", "mountainbiken": "ride", "wandern": "hike", "krafttraining": "strength", "kraft": "strength", "gewichtheben": "strength", "hiit": "hiit", "yoga": "yoga", "rudern": "row", "schwimmen": "swim", "schwimmbad": "swim" };
+  function parseCSV(text) {
+    const rows = []; let row = [], cur = "", q = false;
+    for (let i = 0; i < text.length; i++) { const c = text[i];
+      if (q) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+      else if (c === '"') q = true;
+      else if (c === ",") { row.push(cur); cur = ""; }
+      else if (c === "\n") { row.push(cur); rows.push(row); row = []; cur = ""; }
+      else if (c !== "\r") cur += c;
+    }
+    if (cur !== "" || row.length) { row.push(cur); rows.push(row); }
+    return rows;
+  }
+  function parseWhoopDate(s, tz) {
+    if (!s) return null; s = s.trim(); if (!s) return null;
+    let off = ""; const m = (tz || "").match(/UTC([+-]\d{2}:?\d{2})/); if (m) off = m[1];
+    const t = new Date(s.replace(" ", "T") + off).getTime();
+    return isNaN(t) ? null : t;
+  }
+  // Trainings.csv -> Session-Records (rein, ohne DB-Zugriff – dadurch testbar)
+  function parseWhoopTrainings(text) {
+    const rows = parseCSV(text); if (rows.length < 2) return [];
+    const header = rows[0].map((h) => h.trim().toLowerCase());
+    const idx = (s) => header.findIndex((h) => h.includes(s));
+    const ci = { start: idx("startzeit des trainings"), end: idx("endzeit des trainings"), tz: idx("zeitzone"), name: idx("name der aktivität"), kcal: idx("verbrannte energie"), max: idx("max hf"), avg: idx("durchschnittliche hf"), z1: idx("hf-zone 1"), z2: idx("hf-zone 2"), z3: idx("hf-zone 3"), z4: idx("hf-zone 4"), z5: idx("hf-zone 5") };
+    if (ci.start < 0 || ci.name < 0) return null;
+    const num = (row, i) => (i >= 0 ? (parseFloat((row[i] || "0").replace(",", ".")) || 0) : 0);
+    const recs = [];
+    for (let r = 1; r < rows.length; r++) {
+      const row = rows[r]; if (!row || !row[ci.start]) continue;
+      const start = parseWhoopDate(row[ci.start], row[ci.tz]); if (!start) continue;
+      const end = parseWhoopDate(row[ci.end], row[ci.tz]);
+      const durSec = end && end > start ? Math.round((end - start) / 1000) : 0;
+      const name = (row[ci.name] || "Training").trim();
+      const zp = [num(row, ci.z5), num(row, ci.z4), num(row, ci.z3), num(row, ci.z2), num(row, ci.z1)]; // unsere Reihenfolge Z5..Z1
+      recs.push({ id: "whoop_" + start, start, end: end || start, demo: false, imported: true, kind: WHOOP_MAP[name.toLowerCase()] || "other", kindLabel: name, count: 0, avg: Math.round(num(row, ci.avg)), min: 0, max: Math.round(num(row, ci.max)), rrCount: 0, kcal: Math.round(num(row, ci.kcal)), zoneSec: zp.map((p) => Math.round(durSec * p / 100)), samples: [] });
+    }
+    return recs;
+  }
+  async function importWhoopCSV(file) {
+    let text; try { text = await file.text(); } catch (_) { return; }
+    const recs = parseWhoopTrainings(text);
+    if (recs === null) { showBanner("Das sieht nicht nach einer WHOOP-Trainings.csv aus.", "warn"); setTimeout(hideBanner, 4000); return; }
+    if (!recs.length) { showBanner("Keine Trainings in der Datei gefunden.", "warn"); setTimeout(hideBanner, 3000); return; }
+    const existing = await dbAll(); const ids = new Set(existing.map((s) => s.id));
+    let added = 0, skipped = 0;
+    for (const rec of recs) { if (ids.has(rec.id)) { skipped++; continue; } try { await dbPut(rec); ids.add(rec.id); added++; } catch (_) {} }
+    await renderHistory();
+    if (state.sync.on) syncUp().catch((e) => console.warn("[WHOOPI] Sync nach Import:", e && e.message));
+    showBanner("✅ " + added + " WHOOP-Trainings importiert" + (skipped ? " (" + skipped + " schon vorhanden)" : "") + ".", "info"); setTimeout(hideBanner, 5000);
+  }
+
   /* ============================ Demo-Modus ============================ */
   function startDemo() {
     if (state.server) { showBanner("Erst Gerät trennen, dann Demo.", "warn"); setTimeout(hideBanner, 2500); return; }
@@ -1216,6 +1276,8 @@
   els.syncOffBtn.addEventListener("click", disableSync);
   els.importBtn.addEventListener("click", () => els.importFile.click());
   els.importFile.addEventListener("change", (e) => { const f = e.target.files && e.target.files[0]; if (f) importBackup(f); e.target.value = ""; });
+  els.whoopImportBtn.addEventListener("click", () => els.whoopImportFile.click());
+  els.whoopImportFile.addEventListener("change", (e) => { const f = e.target.files && e.target.files[0]; if (f) importWhoopCSV(f); e.target.value = ""; });
   els.clearAll.addEventListener("click", async () => { if (confirm("Wirklich ALLE gespeicherten Sessions löschen?")) { await dbClear(); await renderHistory(); } });
   els.testVibrateBtn.addEventListener("click", testVibrate);
   els.setAlarmBtn.addEventListener("click", setAlarmAt);
