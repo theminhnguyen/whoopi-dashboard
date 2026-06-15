@@ -350,10 +350,24 @@
         <div id="profileHint" class="save-hint"></div>
       </div>
 
-      <div class="sec-title"><span class="caps" style="font-size:13px;">Backup &amp; Daten</span></div>
+      <div class="sec-title"><span class="caps" style="font-size:13px;">Cloud-Sync · Ende-zu-Ende verschlüsselt</span></div>
+      <div class="card">
+        <div id="syncOff">
+          <div class="info-box" style="margin-bottom:14px;">Synchronisiert deine Aufzeichnungen automatisch zwischen all deinen Geräten. Alles wird mit deinem Passwort <b>auf deinem Gerät verschlüsselt</b>, bevor es hochgeladen wird – der Server sieht nur Datensalat.<br><b>Wichtig:</b> Merk dir das Passwort gut – ohne kommst du an die Daten nicht mehr ran.</div>
+          <div class="field"><label for="syncPass">Sync-Passwort (mind. 8 Zeichen)</label><input id="syncPass" type="password" autocomplete="new-password" placeholder="dein geheimes Passwort" /></div>
+          <button id="syncEnableBtn" class="b-primary b-wide">Cloud-Sync aktivieren</button>
+        </div>
+        <div id="syncOn" class="hidden">
+          <div id="syncStatus" class="info-box" style="margin-bottom:14px;">✓ Cloud-Sync aktiv.</div>
+          <button id="syncNowBtn" class="b-primary b-wide">Jetzt synchronisieren</button>
+          <button id="syncOffBtn" class="b-ghost b-wide" style="margin-top:10px;">Cloud-Sync deaktivieren</button>
+        </div>
+      </div>
+
+      <div class="sec-title"><span class="caps" style="font-size:13px;">Backup-Datei (offline)</span></div>
       <div class="card">
         <div class="info-box" style="margin-bottom:14px;">
-          Deine Aufzeichnungen liegen <b>nur auf diesem Gerät</b>. Exportiere regelmäßig ein Backup und sichere die Datei über das Teilen-Menü in <b>iCloud Drive</b> oder <b>Proton Drive</b>. So hast du sie auch in einem Jahr noch – und kannst sie auf anderen Geräten importieren.
+          Zusätzlich kannst du jederzeit ein <b>Backup als Datei</b> exportieren (z.B. in iCloud/Proton Drive) und auf anderen Geräten importieren. Hinweis: Diese Datei ist <b>unverschlüsselt</b> – leg sie an einen sicheren Ort.
         </div>
         <div class="btns" style="margin-top:0;">
           <button id="exportBtn" class="b-ghost">Backup exportieren</button>
@@ -410,6 +424,8 @@
     WHOOP_CMD_CHAR: "61080002-8d6d-82b8-614a-1c8cb0f8dcc6", // cmd-to-strap 4.0
     WHOOP5_SERVICE: "fd4b0001-cce1-4033-93ce-002d5875f58a", // proprietärer Dienst Whoop 5.0 (Maverick)
     WHOOP5_CMD_CHAR: "fd4b0002-cce1-4033-93ce-002d5875f58a", // cmd-to-strap 5.0
+    SB_URL: "https://cwzsiromtlewzxmrkckg.supabase.co",       // Cloud-Sync-Endpunkt (öffentlich)
+    SB_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3enNpcm9tdGxld3p4bXJrY2tnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MjAwMDIsImV4cCI6MjA5MjI5NjAwMn0.2KVs2Y2edSrMRRG0T2rtJyoDNvvvLI8e-QgJH1kbZp8", // öffentlicher anon-Key (nur RPC erlaubt)
     BATT_POLL_MS: 60000, AUTOSAVE_MS: 15000, CHART_POINTS: 150
   };
   // Zonen als % der max. HR (untere Grenze, Name, Farbe)
@@ -440,7 +456,8 @@
     exportBtn: $("exportBtn"), importBtn: $("importBtn"), importFile: $("importFile"),
     storageHint: $("storageHint"), clearAll: $("clearAll"), diagOutput: $("diagOutput"),
     alarmStatus: $("alarmStatus"), alarmTime: $("alarmTime"), setAlarmBtn: $("setAlarmBtn"), testVibrateBtn: $("testVibrateBtn"), alarmOffBtn: $("alarmOffBtn"),
-    stressVal: $("stressVal"), stressSub: $("stressSub")
+    stressVal: $("stressVal"), stressSub: $("stressSub"),
+    syncPass: $("syncPass"), syncEnableBtn: $("syncEnableBtn"), syncOff: $("syncOff"), syncOn: $("syncOn"), syncStatus: $("syncStatus"), syncNowBtn: $("syncNowBtn"), syncOffBtn: $("syncOffBtn")
   };
 
   const state = {
@@ -448,6 +465,7 @@
     battTimer: null, autosaveTimer: null, beatTimer: null,
     demo: false, demoTimer: null,
     sessionActive: false, session: null, rrSeen: false, rrBuffer: [], bpmBuffer: [], alarmSet: null,
+    sync: { on: false, vid: null, aesKey: null },
     profile: { age: null, weight: null, sex: "m", maxHr: null }
   };
 
@@ -687,6 +705,7 @@
     state.session = null;
     updateActivityControls(); renderZones();
     await renderHistory();
+    if (hadData && state.sync.on) syncUp().catch((e) => console.warn("[WHOOPI] Sync nach Aktivität:", e && e.message));
     if (hadData && doExport) exportCSV(summary || sess);
     if (!hadData) { showBanner("Aktivität ohne Daten – nicht gespeichert.", "warn"); setTimeout(hideBanner, 2500); }
   }
@@ -1016,6 +1035,95 @@
     await shareOrDownload(new Blob([csv], { type: "text/csv;charset=utf-8;" }), fname, csv);
     console.log("[WHOOPI] CSV exportiert:", fname);
   }
+  /* ============================ Cloud-Sync (Ende-zu-Ende verschlüsselt) ============================ */
+  function toB64(bytes) { let s = ""; const C = 0x8000; for (let i = 0; i < bytes.length; i += C) s += String.fromCharCode.apply(null, bytes.subarray(i, i + C)); return btoa(s); }
+  function fromB64(b64) { return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)); }
+  // Aus dem Passwort werden LOKAL ein AES-Schlüssel UND eine unerratbare Tresor-ID (vid) abgeleitet.
+  async function deriveVault(pass) {
+    const enc = new TextEncoder();
+    const base = await crypto.subtle.importKey("raw", enc.encode(pass), "PBKDF2", false, ["deriveBits", "deriveKey"]);
+    const aesKey = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: enc.encode("whoopi-aes-v1"), iterations: 150000, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+    const vidBits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: enc.encode("whoopi-vid-v1"), iterations: 60000, hash: "SHA-256" }, base, 256);
+    const vid = [...new Uint8Array(vidBits)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    return { aesKey, vid };
+  }
+  async function encBlob(aesKey, obj) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, aesKey, new TextEncoder().encode(JSON.stringify(obj)));
+    const out = new Uint8Array(12 + ct.byteLength); out.set(iv); out.set(new Uint8Array(ct), 12);
+    return toB64(out);
+  }
+  async function decBlob(aesKey, b64) {
+    const raw = fromB64(b64);
+    const data = await crypto.subtle.decrypt({ name: "AES-GCM", iv: raw.slice(0, 12) }, aesKey, raw.slice(12));
+    return JSON.parse(new TextDecoder().decode(data));
+  }
+  async function sbRpc(fn, body) {
+    const r = await fetch(CFG.SB_URL + "/rest/v1/rpc/" + fn, { method: "POST", headers: { apikey: CFG.SB_KEY, Authorization: "Bearer " + CFG.SB_KEY, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error("Server " + r.status);
+    const t = await r.text();
+    return t ? JSON.parse(t) : null;
+  }
+  async function syncDown() {
+    const blob = await sbRpc("whoopi_get", { p_vid: state.sync.vid });
+    if (!blob) return 0;
+    let data; try { data = await decBlob(state.sync.aesKey, blob); } catch (_) { throw new Error("Entschlüsselung fehlgeschlagen (falsches Passwort?)"); }
+    const remote = (data && data.sessions) || [];
+    const existing = await dbAll(); const ids = new Set(existing.map((s) => s.id));
+    let added = 0; for (const s of remote) { if (s && s.id && !ids.has(s.id)) { await dbPut(s); added++; } }
+    if (data && data.profile && data.profile.age && !state.profile.age) { state.profile = data.profile; try { localStorage.setItem("whoopi-profile", JSON.stringify(state.profile)); } catch (_) {} loadProfile(); }
+    return added;
+  }
+  async function syncUp() {
+    const sessions = await dbAll();
+    const blob = await encBlob(state.sync.aesKey, { v: 1, ts: Date.now(), profile: state.profile, sessions });
+    await sbRpc("whoopi_put", { p_vid: state.sync.vid, p_blob: blob });
+    return sessions.length;
+  }
+  function setSyncUI() {
+    if (!els.syncOff) return;
+    els.syncOff.classList.toggle("hidden", state.sync.on);
+    els.syncOn.classList.toggle("hidden", !state.sync.on);
+  }
+  async function syncNow(showMsg) {
+    if (!state.sync.on) return;
+    try {
+      const down = await syncDown(); const total = await syncUp();
+      els.syncStatus.textContent = "✓ Synchronisiert " + new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) + " · " + total + " Sessions" + (down ? " (+" + down + " geladen)" : "");
+      await renderHistory();
+      if (showMsg) { showBanner("☁️ Synchronisiert (" + total + " Sessions).", "info"); setTimeout(hideBanner, 3500); }
+    } catch (e) {
+      els.syncStatus.textContent = "⚠️ " + ((e && e.message) || "Sync-Fehler");
+      if (showMsg) { showBanner("❌ Sync: " + (e && e.message), "error"); setTimeout(hideBanner, 4000); }
+    }
+  }
+  async function enableSync(pass) {
+    pass = (pass || "").trim();
+    if (pass.length < 8) { showBanner("Bitte ein Passwort mit mind. 8 Zeichen.", "warn"); setTimeout(hideBanner, 3000); return; }
+    showBanner("Aktiviere Cloud-Sync …", "info");
+    try {
+      const v = await deriveVault(pass);
+      state.sync = { on: true, vid: v.vid, aesKey: v.aesKey };
+      try { localStorage.setItem("whoopi-sync-pass", pass); } catch (_) {}
+      setSyncUI();
+      await syncNow(false);
+      showBanner("✅ Cloud-Sync aktiv. Gleiches Passwort auf anderen Geräten = synchronisiert.", "info"); setTimeout(hideBanner, 5000);
+    } catch (e) { console.error("[WHOOPI] enableSync:", e); showBanner("❌ Sync fehlgeschlagen: " + (e && e.message), "error"); state.sync = { on: false, vid: null, aesKey: null }; setSyncUI(); }
+  }
+  function disableSync() {
+    state.sync = { on: false, vid: null, aesKey: null };
+    try { localStorage.removeItem("whoopi-sync-pass"); } catch (_) {}
+    if (els.syncPass) els.syncPass.value = "";
+    setSyncUI();
+    showBanner("Cloud-Sync deaktiviert (Daten bleiben lokal + in der Cloud).", "info"); setTimeout(hideBanner, 3500);
+  }
+  async function restoreSync() {
+    let pass = null; try { pass = localStorage.getItem("whoopi-sync-pass"); } catch (_) {}
+    if (!pass) { setSyncUI(); return; }
+    try { const v = await deriveVault(pass); state.sync = { on: true, vid: v.vid, aesKey: v.aesKey }; setSyncUI(); await syncNow(false); }
+    catch (e) { console.warn("[WHOOPI] restoreSync:", e && e.message); setSyncUI(); }
+  }
+
   async function exportBackup() {
     let sessions; try { sessions = await dbAll(); } catch (_) { sessions = []; }
     if (!sessions.length) { showBanner("Kein Verlauf zum Sichern.", "warn"); setTimeout(hideBanner, 2500); return; }
@@ -1097,6 +1205,9 @@
   if (els.connectHint) els.connectHint.addEventListener("click", () => switchTab("profile"));
   els.saveProfile.addEventListener("click", saveProfile);
   els.exportBtn.addEventListener("click", exportBackup);
+  els.syncEnableBtn.addEventListener("click", () => enableSync(els.syncPass.value));
+  els.syncNowBtn.addEventListener("click", () => syncNow(true));
+  els.syncOffBtn.addEventListener("click", disableSync);
   els.importBtn.addEventListener("click", () => els.importFile.click());
   els.importFile.addEventListener("change", (e) => { const f = e.target.files && e.target.files[0]; if (f) importBackup(f); e.target.value = ""; });
   els.clearAll.addEventListener("click", async () => { if (confirm("Wirklich ALLE gespeicherten Sessions löschen?")) { await dbClear(); await renderHistory(); } });
@@ -1116,6 +1227,7 @@
     updateActivityControls();
     renderHistory();
     requestPersistence();
+    restoreSync();
   }
   init();
   </script>
