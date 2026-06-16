@@ -1084,7 +1084,9 @@
   }
   async function syncUp() {
     const sessions = await dbAll();
-    const blob = await encBlob(state.sync.aesKey, { v: 1, ts: Date.now(), profile: state.profile, sessions });
+    // Nur Zusammenfassungen in die Cloud (Roh-Messpunkte bleiben lokal) -> Blob klein, weit unter dem 5-MB-Limit
+    const lite = sessions.map((s) => { const c = Object.assign({}, s); delete c.samples; return c; });
+    const blob = await encBlob(state.sync.aesKey, { v: 1, ts: Date.now(), profile: state.profile, sessions: lite });
     await sbRpc("whoopi_put", { p_vid: state.sync.vid, p_blob: blob });
     return sessions.length;
   }
